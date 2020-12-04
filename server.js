@@ -87,6 +87,119 @@ app.post('/login',async (req, res)=>{
 
 })
 
+app.get('/ingresos/sucursales',authenticationToken,async(req, res) => {
+	let sql = `SELECT "SucursalId","Sucursal" AS "Sucursal" FROM sucursales 
+		   WHERE "Status" = $1 `
+	let response
+	const values = ['A']
+	try{
+		response = await pool.query(sql,values) 
+		let data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/ingresos/unidadesdenegocio/:sucursal',authenticationToken,async(req, res) => {
+	const vsucursal = req.params.sucursal
+	let sql = `SELECT "UnidadDeNegocioId","UnidadDeNegocio" FROM unidades_de_negocio
+			WHERE "Status"= $1 AND "UnidadDeNegocioId" IN (SELECT "UnidadDeNegocioId" FROM catalogo_contable 
+									WHERE "SucursalId" = $2)
+		`
+	const values = ['A',vsucursal]
+	let response
+	try{
+		response = await pool.query(sql,values)
+		let data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+	
+})
+
+app.get('/ingresos/cuentascontables/:sucursal/:unidaddenegocio',authenticationToken, async(req, res) => {
+	const vsucursal = req.params.sucursal
+	const vunidaddenegocio = req.params.unidaddenegocio
+
+
+	let sql =  `SELECT "CuentaContableId","CuentaContable" FROM cuentas_contables 
+			WHERE "Status"= $1 AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM catalogo_contable
+									WHERE "SucursalId" = $2 AND "UnidadDeNegocioId" = $3)
+	`
+	let response;
+	const values =['A',vsucursal,vunidaddenegocio] 
+ 	try{
+		response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/ingresos/subcuentascontables/:sucursal/:unidaddenegocio/:cuentacontable',authenticationToken, async(req, res) => {
+	const vsucursal = req.params.sucursal
+	const vunidaddenegocio = req.params.unidaddenegocio
+	const vcuentacontable = req.params.cuentacontable
+
+	let sql = `SELECT "SubcuentaContableId","SubcuentaContable" FROM subcuentas_contables
+			WHERE "CuentaContableId" = $1
+	`
+	let response;
+	const values = [vcuentacontable]
+	try{
+		response = await pool.query(sql, values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
+	const vsucursal = req.body.SucursalId
+
+	let values = []
+	const client = await pool.connect();
+	let sql = ''
+
+	try{
+		await client.query('BEGIN')
+		values = [vsucursal,"now()"]
+		sql = `INSERT INTO tablaprueba ("SucursalId") VALUES ($1,$2) RETURNING "SucursalId"
+		`
+		await client.query(sql,values)
+		await client.query('COMMIT')
+		res.status(200).send("Success!!!")
+	}catch(error){
+		console.log(error.message)
+		await client.query('ROLLBACK')
+		res.status(400).send(error.message)
+	}finally{
+		client.release()
+	}
+
+})
+
+function authenticationToken(req, res, next) {
+    const authHeader = req.headers['authorization']
+    const token = authHeader && authHeader.split(' ')[1]
+    //if (token == null) return res.sendStatus(401)
+    if (token == null) return res.status(401).json({"error": "Token No Existe (Acceso No Autorizado)"})
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user2) => {
+        //if (err) return res.sendStatus(403)
+        if (err) return res.status(403).json({"error": "Token rechazado por Servidor"})
+        req.user = user2
+        next()
+    })
+}
+
 PORT = process.env.PORT || 3001
 
 app.listen(PORT, ()=>{console.log(`Server is running.... on Port ${PORT}`)})
