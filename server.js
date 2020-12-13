@@ -88,12 +88,33 @@ app.post('/login',async (req, res)=>{
 })
 
 app.get('/ingresos/sucursales',authenticationToken,async(req, res) => {
-	let sql = `SELECT "SucursalId","Sucursal" AS "Sucursal" FROM sucursales 
-		   WHERE "Status" = $1 `
+	let sql = `SELECT "SucursalId","Sucursal" AS "Sucursal","SucursalNombre","TipoSucursal" FROM sucursales 
+		   WHERE "Status" = $1
+		   ORDER BY "SucursalId"
+	`
 	let response
 	const values = ['A']
 	try{
 		response = await pool.query(sql,values) 
+		let data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+
+app.get('/ingresos/unidadesdenegociocatalogo',authenticationToken,async(req, res) => {
+	let sql = `SELECT DISTINCT cc."SucursalId", udn."UnidadDeNegocioId", udn."UnidadDeNegocio" 
+			FROM unidades_de_negocio udn
+			INNER JOIN catalogo_contable cc ON cc."UnidadDeNegocioId" = udn."UnidadDeNegocioId"
+			ORDER BY udn."UnidadDeNegocioId"
+	`
+	let values = []
+	let response
+	try{
+		response = await pool.query(sql, values)
 		let data = response.rows
 		res.status(200).json(data)
 	}catch(error){
@@ -121,6 +142,24 @@ app.get('/ingresos/unidadesdenegocio/:sucursal',authenticationToken,async(req, r
 	
 })
 
+app.get('/ingresos/cuentascontablescatalogo',authenticationToken, async(req, res) => {
+	let sql = `SELECT DISTINCT cac."SucursalId",cac."UnidadDeNegocioId",cc."CuentaContableId",cc."CuentaContable"
+			FROM cuentas_contables cc
+        		INNER JOIN catalogo_contable cac ON cac."CuentaContableId" = cc."CuentaContableId"
+			ORDER BY cc."CuentaContableId"
+	`
+	let response;
+	const values = []
+	try{
+		response = await pool.query(sql, values)
+		let data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
 app.get('/ingresos/cuentascontables/:sucursal/:unidaddenegocio',authenticationToken, async(req, res) => {
 	const vsucursal = req.params.sucursal
 	const vunidaddenegocio = req.params.unidaddenegocio
@@ -141,6 +180,24 @@ app.get('/ingresos/cuentascontables/:sucursal/:unidaddenegocio',authenticationTo
 		res.status(500).json({"error": error.message})
 	}
 })
+
+app.get('/ingresos/subcuentascontablescatalogo',authenticationToken, async(req,res) => {
+	let sql = `SELECT DISTINCT cc."SucursalId",cc."UnidadDeNegocioId",cc."CuentaContableId", cc."SubcuentaContableId", scc."SubcuentaContable"
+			FROM subcuentas_contables scc
+			INNER JOIN catalogo_contable cc ON cc."CuentaContableId" = scc."CuentaContableId" AND cc."SubcuentaContableId" = scc."SubcuentaContableId"
+	`
+	let response
+	const values = []
+	try{
+		response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error":error.message})
+	}
+})
+
 
 app.get('/ingresos/subcuentascontables/:sucursal/:unidaddenegocio/:cuentacontable',authenticationToken, async(req, res) => {
 	const vsucursal = req.params.sucursal
@@ -163,7 +220,15 @@ app.get('/ingresos/subcuentascontables/:sucursal/:unidaddenegocio/:cuentacontabl
 })
 
 app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
-	const vsucursal = req.body.SucursalId
+
+	const vsucursalid = req.body.SucursalId
+        const vunidaddenegocioid = req.body.UnidadDeNegocioId
+        const vcuentacontableid = req.body.CuentaContableId
+        const vsubcuentacontableid = req.body.SubcuentaContableId
+        const vfecha = req.body.Fecha
+        const vmonto = req.body.Monto
+        const vcomentarios = req.body.Comentarios
+
 
 	let values = []
 	const client = await pool.connect();
@@ -171,12 +236,27 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 
 	try{
 		await client.query('BEGIN')
-		values = [vsucursal,"now()"]
-		sql = `INSERT INTO tablaprueba ("SucursalId") VALUES ($1,$2) RETURNING "SucursalId"
+		values = [vsucursalid,vunidaddenegocioid,vcuentacontableid,vsubcuentacontableid,vcomentarios,vfecha,'202001',vmonto,'P',"now()",'pendiente','now()']
+		sql = `INSERT INTO registro_contable VALUES (
+		(SELECT COALESCE(MAX("FolioId"),0)+1 FROM registro_contable WHERE "SucursalId" = $1),
+		$1,
+		$2,
+		$3,
+		$4,
+		$5,
+		$6,
+		$7,
+		$8,
+		$9,
+		$10,
+		$11,
+		$12)
+		RETURNING "FolioId","SucursalId"
 		`
-		await client.query(sql,values)
+		let response = await client.query(sql,values)
+		//console.log(response.rows[0].SucursalId)
 		await client.query('COMMIT')
-		res.status(200).send("Success!!!")
+		res.status(200).send("Success!!! FOLIO="+response.rows[0].FolioId)
 	}catch(error){
 		console.log(error.message)
 		await client.query('ROLLBACK')
@@ -185,6 +265,50 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 		client.release()
 	}
 
+})
+
+
+app.get('/ingresos/getIngresos/:fecha',authenticationToken,async(req, res)=> {
+	const vfecha = req.params.fecha
+
+
+	let sql = `SELECT rc."SucursalId",rc."FolioId",s."SucursalNombre",udn."UnidadDeNegocioNombre",cc."CuentaContable",
+		scc."SubcuentaContable",rc."Fecha",rc."Monto"
+		FROM registro_contable rc
+		INNER JOIN sucursales s ON rc."SucursalId"=s."SucursalId"
+		INNER JOIN unidades_de_negocio udn ON rc."UnidadDeNegocioId"=udn."UnidadDeNegocioId"
+		INNER JOIN cuentas_contables cc ON rc."CuentaContableId" = cc."CuentaContableId"
+		INNER JOIN subcuentas_contables scc ON rc."CuentaContableId"= scc."CuentaContableId" AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		WHERE rc."Fecha" = $1
+		`
+	
+	let response;
+	//const values=[vsucursal,vfecha]
+	const values=[vfecha]
+	try{
+		response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/periodoabierto',authenticationToken,async (req, res) => {
+	let sql = `SELECT "Periodo" FROM cierres_mes
+			WHERE "Status" = 'A'
+	`
+	let response;
+	const values=[]
+	try{
+		const data = await pool.query(sql, values)
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
 })
 
 function authenticationToken(req, res, next) {
