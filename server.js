@@ -87,13 +87,25 @@ app.post('/login',async (req, res)=>{
 
 })
 
-app.get('/ingresos/sucursales',authenticationToken,async(req, res) => {
-	let sql = `SELECT "SucursalId","Sucursal" AS "Sucursal","SucursalNombre","TipoSucursal" FROM sucursales 
+app.get('/ingresos/sucursales/:naturalezaCC',authenticationToken,async(req, res) => {
+	/*let sql = `SELECT "SucursalId","Sucursal" AS "Sucursal","SucursalNombre","TipoSucursal" FROM sucursales 
 		   WHERE "Status" = $1
 		   ORDER BY "SucursalId"
 	`
+	*/
+
+	let naturalezaCC = req.params.naturalezaCC;
+	
+	let sql = `SELECT DISTINCT s."SucursalId", s."Sucursal", "SucursalNombre", "TipoSucursal" FROM sucursales s
+	        INNER JOIN catalogo_contable cc on cc."SucursalId" = s."SucursalId"
+       		INNER JOIN cuentas_contables cco on cc."CuentaContableId" = cco."CuentaContableId" AND cco."Status" = $1 AND cco."NaturalezaCC"= $2
+	WHERE s."Status" = $1
+	ORDER BY s."SucursalId"
+`
+
+
 	let response
-	const values = ['A']
+	const values = ['A',naturalezaCC]
 	try{
 		response = await pool.query(sql,values) 
 		let data = response.rows
@@ -105,13 +117,25 @@ app.get('/ingresos/sucursales',authenticationToken,async(req, res) => {
 })
 
 
-app.get('/ingresos/unidadesdenegociocatalogo',authenticationToken,async(req, res) => {
-	let sql = `SELECT DISTINCT cc."SucursalId", udn."UnidadDeNegocioId", udn."UnidadDeNegocio" 
+app.get('/ingresos/unidadesdenegociocatalogo/:naturalezaCC',authenticationToken,async(req, res) => {
+	let naturalezaCC = req.params.naturalezaCC;
+
+	/*let sql = `SELECT DISTINCT cc."SucursalId", udn."UnidadDeNegocioId", udn."UnidadDeNegocio" 
 			FROM unidades_de_negocio udn
 			INNER JOIN catalogo_contable cc ON cc."UnidadDeNegocioId" = udn."UnidadDeNegocioId"
 			ORDER BY udn."UnidadDeNegocioId"
 	`
-	let values = []
+	*/
+
+	let sql = `SELECT DISTINCT cc."SucursalId", udn."UnidadDeNegocioId", udn."UnidadDeNegocio" 
+		FROM unidades_de_negocio udn
+                INNER JOIN catalogo_contable cc on cc."UnidadDeNegocioId" = udn."UnidadDeNegocioId"
+                INNER JOIN cuentas_contables cco on cc."CuentaContableId" = cco."CuentaContableId" AND cco."Status" = $1 AND cco."NaturalezaCC"= $2
+        WHERE udn."Status" = $1
+        ORDER BY udn."UnidadDeNegocioId"
+`
+
+	let values = ['A',naturalezaCC]
 	let response
 	try{
 		response = await pool.query(sql, values)
@@ -142,14 +166,32 @@ app.get('/ingresos/unidadesdenegocio/:sucursal',authenticationToken,async(req, r
 	
 })
 
-app.get('/ingresos/cuentascontablescatalogo',authenticationToken, async(req, res) => {
-	let sql = `SELECT DISTINCT cac."SucursalId",cac."UnidadDeNegocioId",cc."CuentaContableId",cc."CuentaContable"
+app.get('/ingresos/cuentascontablescatalogo/:naturalezaCC',authenticationToken, async(req, res) => {
+	let naturalezaCC = req.params.naturalezaCC;
+
+	/*let sql = `SELECT DISTINCT cac."SucursalId",cac."UnidadDeNegocioId",cc."CuentaContableId",cc."CuentaContable",cc."NaturalezaCC"
 			FROM cuentas_contables cc
         		INNER JOIN catalogo_contable cac ON cac."CuentaContableId" = cc."CuentaContableId"
 			ORDER BY cc."CuentaContableId"
 	`
+	*/
+
+
+
+	let sql = `SELECT DISTINCT cac."SucursalId",cac."UnidadDeNegocioId", cc."CuentaContableId",cc."CuentaContable",cc."NaturalezaCC" 
+                FROM  cuentas_contables cc 
+                INNER JOIN catalogo_contable cac on cac."CuentaContableId" = cc."CuentaContableId"
+        	WHERE cc."Status" = $1 AND cc."NaturalezaCC" = $2
+        ORDER BY cc."CuentaContableId"
+	`
+
+
+
+
+
+
 	let response;
-	const values = []
+	const values = ['A',naturalezaCC]
 	try{
 		response = await pool.query(sql, values)
 		let data = response.rows
@@ -181,13 +223,27 @@ app.get('/ingresos/cuentascontables/:sucursal/:unidaddenegocio',authenticationTo
 	}
 })
 
-app.get('/ingresos/subcuentascontablescatalogo',authenticationToken, async(req,res) => {
-	let sql = `SELECT DISTINCT cc."SucursalId",cc."UnidadDeNegocioId",cc."CuentaContableId", cc."SubcuentaContableId", scc."SubcuentaContable"
+app.get('/ingresos/subcuentascontablescatalogo/:naturalezaCC',authenticationToken, async(req,res) => {
+	const naturalezaCC = req.params.naturalezaCC;
+
+	/*let sql = `SELECT DISTINCT cc."SucursalId",cc."UnidadDeNegocioId",cc."CuentaContableId", cc."SubcuentaContableId", scc."SubcuentaContable"
 			FROM subcuentas_contables scc
 			INNER JOIN catalogo_contable cc ON cc."CuentaContableId" = scc."CuentaContableId" AND cc."SubcuentaContableId" = scc."SubcuentaContableId"
 	`
+	*/
+
+
+	let sql = `SELECT DISTINCT cc."SucursalId",cc."UnidadDeNegocioId",scc."CuentaContableId", scc."SubcuentaContableId", scc."SubcuentaContable"
+		FROM subcuentas_contables scc
+		INNER JOIN cuentas_contables cco ON cco."CuentaContableId" = scc."CuentaContableId" AND cco."Status" = 'A'
+                INNER JOIN catalogo_contable cc on cc."CuentaContableId" = scc."CuentaContableId" AND cc."SubcuentaContableId" = scc."SubcuentaContableId"
+                WHERE scc."Status" = $1 AND cco."NaturalezaCC" = $2
+        ORDER BY scc."SubcuentaContableId"
+        `
+
+
 	let response
-	const values = []
+	const values = ['A',naturalezaCC]
 	try{
 		response = await pool.query(sql,values)
 		const data = response.rows
@@ -228,6 +284,7 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
         const vfecha = req.body.Fecha
         const vmonto = req.body.Monto
         const vcomentarios = req.body.Comentarios
+	const vusuario = req.body.Usuario
 
 
 	let values = []
@@ -236,7 +293,7 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 
 	try{
 		await client.query('BEGIN')
-		values = [vsucursalid,vunidaddenegocioid,vcuentacontableid,vsubcuentacontableid,vcomentarios,vfecha,'202001',vmonto,'P',"now()",'pendiente','now()']
+		values = [vsucursalid,vunidaddenegocioid,vcuentacontableid,vsubcuentacontableid,vcomentarios,vfecha,'202001',vmonto,'P',"now()",vusuario,'now()']
 		sql = `INSERT INTO registro_contable VALUES (
 		(SELECT COALESCE(MAX("FolioId"),0)+1 FROM registro_contable WHERE "SucursalId" = $1),
 		$1,
@@ -268,23 +325,31 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 })
 
 
-app.get('/ingresos/getIngresos/:fecha',authenticationToken,async(req, res)=> {
+//app.get('/ingresos/getIngresos/:fecha/:sucursal/:unidaddenegocio/:cuentacontable/:subcuentacontable',authenticationToken,async(req, res)=> {
+app.get('/ingresos/getIngresos/:fecha/:sucursal',authenticationToken,async(req, res)=> {
 	const vfecha = req.params.fecha
+	const vsucursal = req.params.sucursal
+	const vunidaddenegocio = req.params.unidaddenegocio
+	const vcuentacontable = req.params.cuentacontable
+	const vsubcuentacontable = req.params.subcuentacontable
 
 
-	let sql = `SELECT rc."SucursalId",rc."FolioId",s."SucursalNombre",udn."UnidadDeNegocioNombre",cc."CuentaContable",
+	let sql = `SELECT rc."SucursalId",rc."FolioId",s."SucursalNombre",udn."UnidadDeNegocioId",udn."UnidadDeNegocioNombre",cc."CuentaContableId",
+		cc."CuentaContable",scc."SubcuentaContableId",
 		scc."SubcuentaContable",rc."Fecha",rc."Monto"
 		FROM registro_contable rc
 		INNER JOIN sucursales s ON rc."SucursalId"=s."SucursalId"
 		INNER JOIN unidades_de_negocio udn ON rc."UnidadDeNegocioId"=udn."UnidadDeNegocioId"
 		INNER JOIN cuentas_contables cc ON rc."CuentaContableId" = cc."CuentaContableId"
 		INNER JOIN subcuentas_contables scc ON rc."CuentaContableId"= scc."CuentaContableId" AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
-		WHERE rc."Fecha" = $1
+		WHERE rc."Fecha" = $1 AND rc."SucursalId" = $2 
 		`
+		//WHERE rc."Fecha" = $1 AND rc."SucursalId" = $2 AND rc."UnidadDeNegocioId" = $3 AND rc."CuentaContableId" = $4 AND rc."SubcuentaContableId" = $5
 	
 	let response;
 	//const values=[vsucursal,vfecha]
-	const values=[vfecha]
+	//const values=[vfecha,vsucursal,vunidaddenegocio,vcuentacontable,vsubcuentacontable]
+	const values=[vfecha,vsucursal]
 	try{
 		response = await pool.query(sql,values)
 		const data = response.rows
@@ -297,7 +362,7 @@ app.get('/ingresos/getIngresos/:fecha',authenticationToken,async(req, res)=> {
 })
 
 app.get('/periodoabierto',authenticationToken,async (req, res) => {
-	let sql = `SELECT "Periodo" FROM cierres_mes
+	let sql = `SELECT "Periodo","PrimerDiaMes" FROM cierres_mes
 			WHERE "Status" = 'A'
 	`
 	let response;
@@ -308,6 +373,108 @@ app.get('/periodoabierto',authenticationToken,async (req, res) => {
 	}catch(error){
 		console.log(error.message)
 		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/catalogos/:id',authenticationToken,async (req,res) => {
+	const id = req.params.id
+	let sql;
+	if (id === '1'){
+		sql = `SELECT "CategoriaId","Categoria" FROM categorias`
+	}
+
+	if (id === '2'){
+		sql = `SELECT "CategoriaId","SubcategoriaId","Subcategoria" FROM subcategorias`
+	}
+	if (id === '3'){
+		sql = `SELECT "MedidaCapacidadId","MedidaCapacidad" FROM medidas_capacidad`
+	}
+	if (id === '4'){
+		sql = `SELECT "MedidaVentaId","MedidaVenta" FROM medidas_venta`
+	}
+	if (id === '5'){
+		sql = `SELECT "MarcaId","Marca" FROM marcas`
+	}
+	if ( id === '6'){
+		sql = `SELECT "ColorId","Color" FROM colores`
+	}
+	if (id === '7'){
+		sql = `SELECT "SaborId","Sabor" FROM sabores`
+	}
+	if (id === '8'){
+		sql = `SELECT "IVAId","Descripcion", "IVA" FROM impuestos_iva`
+	}
+	if (id === '9'){
+		sql = `SELECT "IEPSId","Descripcion", "IEPS" FROM impuestos_ieps`
+	}
+
+	let response;
+	try{
+		const data = await pool.query(sql)
+		res.status(200).json(data)
+
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+
+app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
+	const { CodigoBarras, Descripcion, CategoriaId, SubcategoriaId, UnidadesCapacidad, MedidaCapacidadId, UnidadesVenta, MedidaVentaId, MarcaId, ColorId,
+	SaborId, IVAId, IEPSId, Usuario } = req.body
+
+	const client = await pool.connect()
+	try{
+		await client.query('BEGIN')
+		let sql = `SELECT COALESCE(MAX("CodigoId"),0)+1 AS "CodigoId" FROM productos`
+		let response = await client.query(sql) 
+		const CodigoId = response.rows[0].CodigoId
+
+		let values=[CodigoId,CodigoBarras, Descripcion, CategoriaId, SubcategoriaId, UnidadesCapacidad, MedidaCapacidadId, UnidadesVenta, MedidaVentaId, 
+	    		    MarcaId, ColorId, SaborId, IVAId, IEPSId, Usuario]
+
+		//INSERT productos
+	     	sql = `INSERT INTO productos("CodigoId","CodigoBarras","Descripcion","CategoriaId","SubcategoriaId","UnidadesCapacidad","MedidaCapacidadId",
+ 	        	   "UnidadesVenta","MedidaVentaId","MarcaId","ColorId","SaborId","IVAId","IEPSId","Usuario","FechaHora") 
+ 			   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,now()) RETURNING "CodigoId";
+		`
+		response = await client.query(sql,values)
+
+		//INSERT codigos_barras
+		values = [CodigoBarras, CodigoId, Usuario]
+		sql = `INSERT INTO codigos_barras ("CodigoBarras","CodigoId","FechaHora","Usuario") VALUES ($1,$2,NOW(),$3)`
+		await client.query(sql,values)
+
+		//INSERT inventario_perpetuo
+		sql = `SELECT "SucursalId" FROM sucursales WHERE "TipoSucursal" = 'S'`
+		const arregloSucursales = await client.query(sql)
+
+		//arregloSucursales.rows.forEach(async (element)=>{
+		for (let i=0; i < arregloSucursales.rows.length; i++){
+			//console.log(element.SucursalId)
+			//console.log(arregloSucursales.rows[i].SucursalId)
+
+			//values=[element.SucursalId,CodigoId,0,0.00,0.00,30,0,0,IVAId,IVA,IVAMonto,IEPSId,IEPS,IEPSMonto,0,0,0,now(),'1900-01-01',null,null,0]
+			values=[arregloSucursales.rows[i].SucursalId,CodigoId,0,0.00,0.00,30,0.00,0.00,IVAId,0.00,0.00,IEPSId,0.00,0.00,0.00,0,0,"now()",'1900-01-01',null,null,0]
+
+			sql = `INSERT INTO inventario_perpetuo ("SucursalId","CodigoId","UnidadesExistencia","CostoCompra","CostoPromedio","Margen","MargenReal",
+			"PrecioVentaSinImpuesto","IVAId","IVA","IVAMonto","IEPSId","IEPS","IEPSMonto","PrecioVentaConImpuesto","Maximo","Minimo","FechaHora","FechaCambioPrecio",
+			"FechaUltimaVenta","FechaUltimaCompra","CostoBasePrecioVenta")
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+			`
+			await client.query(sql, values)
+		}
+
+		await client.query('COMMIT')
+		res.status(200).json({"Success":response.rows[0].CodigoId})
+
+	}catch(error){
+		console.log(error.message)
+		await client.query('ROLLBACK')
+		res.status(500).json({"error":error.message})
+	}finally{
+		client.release()
 	}
 })
 
@@ -324,6 +491,6 @@ function authenticationToken(req, res, next) {
     })
 }
 
-PORT = process.env.PORT || 3001
+const port = process.env.PORT || 3001
 
-app.listen(PORT, ()=>{console.log(`Server is running.... on Port ${PORT}`)})
+app.listen(port, ()=>{console.log(`Server is running.... on Port ${port}`)})
