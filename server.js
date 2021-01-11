@@ -185,11 +185,6 @@ app.get('/ingresos/cuentascontablescatalogo/:naturalezaCC',authenticationToken, 
         ORDER BY cc."CuentaContableId"
 	`
 
-
-
-
-
-
 	let response;
 	const values = ['A',naturalezaCC]
 	try{
@@ -325,7 +320,6 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 })
 
 
-//app.get('/ingresos/getIngresos/:fecha/:sucursal/:unidaddenegocio/:cuentacontable/:subcuentacontable',authenticationToken,async(req, res)=> {
 app.get('/ingresos/getIngresos/:fecha/:sucursal',authenticationToken,async(req, res)=> {
 	const vfecha = req.params.fecha
 	const vsucursal = req.params.sucursal
@@ -410,7 +404,8 @@ app.get('/api/catalogos/:id',authenticationToken,async (req,res) => {
 
 	let response;
 	try{
-		const data = await pool.query(sql)
+		response = await pool.query(sql)
+		const data = response.rows
 		res.status(200).json(data)
 
 	}catch(error){
@@ -422,7 +417,7 @@ app.get('/api/catalogos/:id',authenticationToken,async (req,res) => {
 
 app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 	const { CodigoBarras, Descripcion, CategoriaId, SubcategoriaId, UnidadesCapacidad, MedidaCapacidadId, UnidadesVenta, MedidaVentaId, MarcaId, ColorId,
-	SaborId, IVAId, IEPSId, Usuario } = req.body
+	SaborId, IVAId, IVA, IEPSId, IEPS, Usuario } = req.body
 
 	const client = await pool.connect()
 	try{
@@ -452,11 +447,7 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 
 		//arregloSucursales.rows.forEach(async (element)=>{
 		for (let i=0; i < arregloSucursales.rows.length; i++){
-			//console.log(element.SucursalId)
-			//console.log(arregloSucursales.rows[i].SucursalId)
-
-			//values=[element.SucursalId,CodigoId,0,0.00,0.00,30,0,0,IVAId,IVA,IVAMonto,IEPSId,IEPS,IEPSMonto,0,0,0,now(),'1900-01-01',null,null,0]
-			values=[arregloSucursales.rows[i].SucursalId,CodigoId,0,0.00,0.00,30,0.00,0.00,IVAId,0.00,0.00,IEPSId,0.00,0.00,0.00,0,0,"now()",'1900-01-01',null,null,0]
+			values=[arregloSucursales.rows[i].SucursalId,CodigoId,0,0.00,0.00,30,0.00,0.00,IVAId,IVA,0.00,IEPSId,IEPS,0.00,0.00,6,2,"now()",null,null,null,0.00]
 
 			sql = `INSERT INTO inventario_perpetuo ("SucursalId","CodigoId","UnidadesExistencia","CostoCompra","CostoPromedio","Margen","MargenReal",
 			"PrecioVentaSinImpuesto","IVAId","IVA","IVAMonto","IEPSId","IEPS","IEPSMonto","PrecioVentaConImpuesto","Maximo","Minimo","FechaHora","FechaCambioPrecio",
@@ -475,6 +466,23 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 		res.status(500).json({"error":error.message})
 	}finally{
 		client.release()
+	}
+})
+
+app.get('/api/consultaProductosRecientes',authenticationToken, async(req, res)=>{
+
+	//let sql = `SELECT "CodigoId","CodigoBarras","Descripcion" FROM productos ORDER BY "CodigoId" DESC LIMIT 10`
+	let sql = `SELECT "CodigoId","CodigoBarras","Descripcion" FROM vw_productos_descripcion ORDER BY "CodigoId" DESC LIMIT 10`
+	let response;
+
+	try{
+		const response = await pool.query(sql)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+
 	}
 })
 
