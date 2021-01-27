@@ -87,7 +87,7 @@ app.post('/login',async (req, res)=>{
 
 })
 
-app.get('/ingresos/sucursales/:naturalezaCC',authenticationToken,async(req, res) => {
+app.get('/api/sucursales/:naturalezaCC',authenticationToken,async(req, res) => {
 	/*let sql = `SELECT "SucursalId","Sucursal" AS "Sucursal","SucursalNombre","TipoSucursal" FROM sucursales 
 		   WHERE "Status" = $1
 		   ORDER BY "SucursalId"
@@ -374,32 +374,41 @@ app.get('/api/catalogos/:id',authenticationToken,async (req,res) => {
 	const id = req.params.id
 	let sql;
 	if (id === '1'){
-		sql = `SELECT "CategoriaId","Categoria" FROM categorias`
+		sql = `SELECT "CategoriaId","Categoria" FROM categorias ORDER BY "CategoriaId"`
 	}
 
 	if (id === '2'){
-		sql = `SELECT "CategoriaId","SubcategoriaId","Subcategoria" FROM subcategorias`
+		sql = `SELECT "CategoriaId","SubcategoriaId","Subcategoria" FROM subcategorias ORDER BY "CategoriaId", "SubcategoriaId"`
 	}
 	if (id === '3'){
-		sql = `SELECT "MedidaCapacidadId","MedidaCapacidad" FROM medidas_capacidad`
+		sql = `SELECT "MedidaCapacidadId","MedidaCapacidad" FROM medidas_capacidad ORDER BY "MedidaCapacidadId"`
 	}
 	if (id === '4'){
-		sql = `SELECT "MedidaVentaId","MedidaVenta" FROM medidas_venta`
+		sql = `SELECT "MedidaVentaId","MedidaVenta" FROM medidas_venta ORDER BY "MedidaVentaId"`
 	}
 	if (id === '5'){
-		sql = `SELECT "MarcaId","Marca" FROM marcas`
+		sql = `SELECT "MarcaId","Marca" FROM marcas ORDER BY "MarcaId"`
 	}
 	if ( id === '6'){
-		sql = `SELECT "ColorId","Color" FROM colores`
+		sql = `SELECT "ColorId","Color" FROM colores ORDER BY "ColorId"`
 	}
 	if (id === '7'){
-		sql = `SELECT "SaborId","Sabor" FROM sabores`
+		sql = `SELECT "SaborId","Sabor" FROM sabores ORDER BY "SaborId"`
 	}
 	if (id === '8'){
-		sql = `SELECT "IVAId","Descripcion", "IVA" FROM impuestos_iva`
+		sql = `SELECT "IVAId","Descripcion", "IVA" FROM impuestos_iva ORDER BY "IVAId"`
 	}
 	if (id === '9'){
-		sql = `SELECT "IEPSId","Descripcion", "IEPS" FROM impuestos_ieps`
+		sql = `SELECT "IEPSId","Descripcion", "IEPS" FROM impuestos_ieps ORDER BY "IEPSId"`
+	}
+	if (id === '10'){
+		sql = `SELECT "SucursalId","Sucursal" FROM sucursales WHERE "Status" = 'A' AND "TipoSucursal" = 'S' ORDER BY "SucursalId"`
+	}
+	if (id === '11'){
+		sql = `SELECT "ProveedorId","Proveedor","IVA" FROM proveedores WHERE "Status" = 'A' ORDER BY "ProveedorId"`
+	}
+	if (id === '12'){
+		sql = `SELECT "SocioId","Socio" FROM socios WHERE "Status" = 'A'`
 	}
 
 	let response;
@@ -469,11 +478,85 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 	}
 })
 
+app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>{
+	const { SucursalId, UnidadDeNegocioId, ProveedorId,IVA, NumeroFactura, TotalFactura, SocioId, detalles } = req.body
+	//console.log(detalles[0].CodigoId)
+	
+	const client = await pool.connect();
+	try{
+		await client.query('BEGIN')
+		let sql = `SELECT COALESCE(MAX("FolioId"),0)+1 AS "FolioId" FROM compras WHERE "SucursalId" = ${SucursalId}`
+		let response = await client.query(sql) 
+		let FolioId = response.rows[0].FolioId
+
+		//const CodigoId = response.rows[0].CodigoId
+
+		for (let i=1; i <= detalles.length; i++){
+
+			sql = `"CategoriaId","SubcategoriaId","UnidadesInventario",     `
+
+		let values=[SucursalId,UnidadDeNegocioId,FolioId,i,'R',ProveedorId,NumeroFactura,TotalFactura,SocioId,'P','NOW()',CategoriaIdxxx,SubcategoriaIdxxx,detalles[i].CodigoId,detalles[i].CodigoBarras,detalles[i].UnidadesRecibidas,UnidadesInventarioAntesxxx,UnidadesInventarioDespuesxxx,detalles[i].CostoCompraSinIva,detalles[i].IVACostoCompra,IVAProveedorxxx,detalles[i].IEPSCostoCompra,IEPSProveedorxxx,detalles[i].CostoCompra,CostoPromedioxxx,CostoCompraAntxxx,CostoPromedioAntxxx,PrecioVentaSinImpuestoxxx,PrecioVentaConImpuestoxxx,ColaboradorIdxxx,'NOW()']
+
+
+		sql = `INSERT INTO compras 
+		("SucursalId",
+		"UnidadDeNegocioId",
+		"FolioId",
+		"Secuencial",
+		"Status",
+		"ProveedorId",
+		"NumeroFactura",
+		"TotalFactura",
+		"SocioId",
+		"SocioPagoStatus",
+		"FechaRecepcion",
+		"CategoriaId",
+		"SubcategoriaId",
+		"CodigoId",
+		"CodigoBarras",
+		"UnidadesRecibidas",
+		"UnidadesInventarioAntes",
+		"UnidadesInventarioDespues",
+		"CostoCompraSinIva",
+		"IVACostoCompra",
+		"IVAProveedor",
+		"IEPSCostoCompra",
+		"IEPS",
+		"CostoCompra",
+		"CostoPromedio",
+		"CostoCompraAnt",
+		"CostoPromedioAnt",
+		"PrecioVentaSinImpuesto",
+		"PrecioVentaConImpuesto",
+		"ColaboradorId",
+		"FechaHora")
+		 VALUES ($1,$2,
+		 (SELECT COALESCE(MAX("FolioId),1) FROM compras WHERE "SucursalId" = $1 )
+		 )`
+		//const respuesta = await client.query(sql, values)
+		
+
+
+
+		}
+
+
+
+		await client.query('COMMIT')
+		res.status(200).json({"Success": "SI"}) 
+	}catch(error){
+		console.log(error.message)
+		await client.query('ROLLBACK')
+		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
+	}
+})
+
 app.get('/api/consultaProductosRecientes',authenticationToken, async(req, res)=>{
 
 	//let sql = `SELECT "CodigoId","CodigoBarras","Descripcion" FROM productos ORDER BY "CodigoId" DESC LIMIT 10`
 	let sql = `SELECT "CodigoId","CodigoBarras","Descripcion" FROM vw_productos_descripcion ORDER BY "CodigoId" DESC LIMIT 10`
-	let response;
 
 	try{
 		const response = await pool.query(sql)
@@ -483,6 +566,25 @@ app.get('/api/consultaProductosRecientes',authenticationToken, async(req, res)=>
 		console.log(error.message)
 		res.status(500).json({"error": error.message})
 
+	}
+})
+
+app.get('/api/productodescripcion/:id',authenticationToken, async(req, res) =>{
+	const id = req.params.id
+	const sql = `SELECT vwpd."CodigoId", vwpd."Descripcion",p."IVAId",ii."Descripcion" AS "IVADescripcion",ii."IVA",p."IEPSId",ie."Descripcion" AS "IEPSDescripcion", ie."IEPS"
+			FROM vw_productos_descripcion vwpd
+			INNER JOIN productos p ON p."CodigoId" = vwpd."CodigoId"
+			INNER JOIN impuestos_iva ii ON ii."IVAId" = p."IVAId"
+			INNER JOIN impuestos_ieps ie ON ie."IEPSId" = p."IEPSId"
+			WHERE vwpd."CodigoBarras" = $1`
+	const values=[id]
+	try{
+		const response = await pool.query(sql, values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
 	}
 })
 
