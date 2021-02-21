@@ -426,7 +426,7 @@ app.get('/api/catalogos/:id',authenticationToken,async (req,res) => {
 
 app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 	const { CodigoBarras, Descripcion, CategoriaId, SubcategoriaId, UnidadesCapacidad, MedidaCapacidadId, UnidadesVenta, MedidaVentaId, MarcaId, ColorId,
-	SaborId, IVAId, IVA, IEPSId, IEPS, Usuario } = req.body
+	SaborId, IVAId, IVA, IVACompra, IEPSId, IEPS, Usuario } = req.body
 
 	const client = await pool.connect()
 	try{
@@ -436,12 +436,12 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 		const CodigoId = response.rows[0].CodigoId
 
 		let values=[CodigoId,CodigoBarras, Descripcion, CategoriaId, SubcategoriaId, UnidadesCapacidad, MedidaCapacidadId, UnidadesVenta, MedidaVentaId, 
-	    		    MarcaId, ColorId, SaborId, IVAId, IEPSId, Usuario]
+	    		    MarcaId, ColorId, SaborId, IVAId, IVACompra, IEPSId, Usuario]
 
 		//INSERT productos
 	     	sql = `INSERT INTO productos("CodigoId","CodigoBarras","Descripcion","CategoriaId","SubcategoriaId","UnidadesCapacidad","MedidaCapacidadId",
- 	        	   "UnidadesVenta","MedidaVentaId","MarcaId","ColorId","SaborId","IVAId","IEPSId","Usuario","FechaHora") 
- 			   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,now()) RETURNING "CodigoId";
+ 	        	   "UnidadesVenta","MedidaVentaId","MarcaId","ColorId","SaborId","IVAId","IVACompra","IEPSId","Usuario","FechaHora") 
+ 			   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,now()) RETURNING "CodigoId";
 		`
 		response = await client.query(sql,values)
 
@@ -458,7 +458,7 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 		for (let i=0; i < arregloSucursales.rows.length; i++){
 			values=[arregloSucursales.rows[i].SucursalId,CodigoId,0,0.00,0.00,30,0.00,0.00,IVAId,IVA,0.00,IEPSId,IEPS,0.00,0.00,6,2,"now()",null,null,null,0.00]
 
-			sql = `INSERT INTO inventario_perpetuo ("SucursalId","CodigoId","UnidadesExistencia","CostoCompra","CostoPromedio","Margen","MargenReal",
+			sql = `INSERT INTO inventario_perpetuo ("SucursalId","CodigoId","UnidadesInventario","CostoCompra","CostoPromedio","Margen","MargenReal",
 			"PrecioVentaSinImpuesto","IVAId","IVA","IVAMonto","IEPSId","IEPS","IEPSMonto","PrecioVentaConImpuesto","Maximo","Minimo","FechaHora","FechaCambioPrecio",
 			"FechaUltimaVenta","FechaUltimaCompra","CostoBasePrecioVenta")
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
@@ -479,23 +479,107 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 })
 
 app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>{
-	const { SucursalId, UnidadDeNegocioId, ProveedorId,IVA, NumeroFactura, TotalFactura, SocioId, detalles } = req.body
+	const { SucursalId, UnidadDeNegocioId, ProveedorId,IVAProveedor, NumeroFactura, TotalFactura, SocioId,Usuario, detalles } = req.body
 	//console.log(detalles[0].CodigoId)
-	
+
 	const client = await pool.connect();
+			let Secuencial = 0 
+			let Status = 'R'
+			let CategoriaId = 0 
+			let SubcategoriaId = 0 
+			let CodigoId = 0
+			let CodigoBarras = "" 
+			let UnidadesRecibidas = 0 
+			let UnidadesInventario = 0
+			let UnidadesInventarioAntes = 0 
+			let UnidadesInventarioDespues= 0
+			let CostoCompraSinImpuestos = 0.0
+			let IVACostoCompra = 0.0
+			let IEPS = 0
+			let IEPSCostoCompra = 0.0
+			let CostoCompra = 0.0
+			let CostoCompraAnt = 0.0
+			let CostoPromedioAnt = 0.0
+			let Margen = 0.0
+			let PrecioVentaSinImpuesto = 0.0 
+			let PrecioVentaConImpuesto = 0.0
+			let NuevoPrecioVentaSinImpuesto = 0.0 
+			let NuevoPrecioVentaConImpuesto = 0.0
+
+			let SocioPagoStatus = 'P'
+
+
+			let CostoPromedio = 0.0
+
+		let values=[]
+
+		let MargenReal = 0.0
+		let IVAId = 0
+		let IVA = 0
+		let IVAMonto = 0.0 
+		let IEPSId = 0
+		let IEPSMonto = 0.0
 	try{
 		await client.query('BEGIN')
 		let sql = `SELECT COALESCE(MAX("FolioId"),0)+1 AS "FolioId" FROM compras WHERE "SucursalId" = ${SucursalId}`
 		let response = await client.query(sql) 
 		let FolioId = response.rows[0].FolioId
 
-		//const CodigoId = response.rows[0].CodigoId
+		sql = `SELECT "ColaboradorId" FROM colaboradores WHERE "User" = '${Usuario}' ` 
+		response = await client.query(sql)
+		let ColaboradorId = response.rows[0].ColaboradorId
 
-		for (let i=1; i <= detalles.length; i++){
 
-			sql = `"CategoriaId","SubcategoriaId","UnidadesInventario",     `
 
-		let values=[SucursalId,UnidadDeNegocioId,FolioId,i,'R',ProveedorId,NumeroFactura,TotalFactura,SocioId,'P','NOW()',CategoriaIdxxx,SubcategoriaIdxxx,detalles[i].CodigoId,detalles[i].CodigoBarras,detalles[i].UnidadesRecibidas,UnidadesInventarioAntesxxx,UnidadesInventarioDespuesxxx,detalles[i].CostoCompraSinIva,detalles[i].IVACostoCompra,IVAProveedorxxx,detalles[i].IEPSCostoCompra,IEPSProveedorxxx,detalles[i].CostoCompra,CostoPromedioxxx,CostoCompraAntxxx,CostoPromedioAntxxx,PrecioVentaSinImpuestoxxx,PrecioVentaConImpuestoxxx,ColaboradorIdxxx,'NOW()']
+
+
+		for (let i=0; i < detalles.length; i++){
+
+		sql=`SELECT p."CategoriaId",p."SubcategoriaId",ip."UnidadesInventario",ip."CostoCompra",p."IVAId",ii."IVA",p."IEPSId",iie."IEPS",ip."CostoPromedio",ip."Margen",ip."PrecioVentaSinImpuesto",
+			ip."PrecioVentaConImpuesto"
+			FROM productos p
+			INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = p."CodigoId"
+			INNER JOIN impuestos_iva ii ON ii."IVAId" = p."IVAId"
+			INNER JOIN impuestos_ieps iie ON iie."IEPSId" = p."IEPSId"
+			WHERE ip."SucursalId" = ${SucursalId}  
+			AND  p."CodigoId" = ${detalles[i].CodigoId} 
+		`
+			response = await client.query(sql)
+			Secuencial = i + 1
+			Status = 'R'
+			CategoriaId = response.rows[0].CategoriaId
+			SubcategoriaId = response.rows[0].SubcategoriaId
+			CodigoId = detalles[i].CodigoId
+			CodigoBarras = detalles[i].CodigoBarras
+			UnidadesRecibidas = detalles[i].UnidadesRecibidas
+			UnidadesInventario = response.rows[0].UnidadesInventario
+			UnidadesInventarioAntes = response.rows[0].UnidadesInventario
+			UnidadesInventarioDespues= parseInt(response.rows[0].UnidadesInventario) + parseInt(UnidadesRecibidas)
+			CostoCompraSinImpuestos = detalles[i].CostoCompraSinImpuestos
+			IVACostoCompra = detalles[i].IVAMonto
+			IEPS = detalles[i].IEPS
+			IEPSCostoCompra = detalles[i].IEPSMonto
+			CostoCompra = detalles[i].CostoCompra
+			CostoCompraAnt = response.rows[0].CostoCompra
+			CostoPromedioAnt = response.rows[0].CostoPromedio
+			Margen = response.rows[0].Margen
+			IVAId = response.rows[0].IVAId
+			IVAVenta = response.rows[0].IVA
+			IEPSId = response.rows[0].IEPSId
+			PrecioVentaSinImpuesto = response.rows[0].PrecioVentaSinImpuesto
+			PrecioVentaConImpuesto = response.rows[0].PrecioVentaConImpuesto
+
+			SocioPagoStatus = 'P'
+
+
+			CostoPromedio = ((parseInt(detalles[i].UnidadesRecibidas) * parseFloat(detalles[i].CostoCompra)) + (parseInt(UnidadesInventario)*parseFloat(CostoCompraAnt))) / (parseInt(detalles[i].UnidadesRecibidas) + parseInt(UnidadesInventario))
+
+			// Si SocioId es igual a uno es que la compra se realizó con dinero de la empresa y el SocioPagoStatus es CERRADO o COBRADO
+			if (SocioId === 1){
+				SocioPagoStatus = 'C'
+			}
+
+		values=[SucursalId,UnidadDeNegocioId,FolioId,Secuencial,Status,ProveedorId,NumeroFactura,TotalFactura,SocioId,SocioPagoStatus,"NOW()",CategoriaId,SubcategoriaId,CodigoId,CodigoBarras,UnidadesRecibidas,UnidadesInventarioAntes,UnidadesInventarioDespues,CostoCompraSinImpuestos,IVACostoCompra,IVAProveedor,IEPSCostoCompra,IEPS,CostoCompra,CostoPromedio,CostoCompraAnt,CostoPromedioAnt,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,ColaboradorId,"NOW()"]
 
 
 		sql = `INSERT INTO compras 
@@ -517,7 +601,7 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 		"UnidadesRecibidas",
 		"UnidadesInventarioAntes",
 		"UnidadesInventarioDespues",
-		"CostoCompraSinIva",
+		"CostoCompraSinImpuesto",
 		"IVACostoCompra",
 		"IVAProveedor",
 		"IEPSCostoCompra",
@@ -530,16 +614,64 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 		"PrecioVentaConImpuesto",
 		"ColaboradorId",
 		"FechaHora")
-		 VALUES ($1,$2,
-		 (SELECT COALESCE(MAX("FolioId),1) FROM compras WHERE "SucursalId" = $1 )
-		 )`
-		//const respuesta = await client.query(sql, values)
-		
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
+		RETURNING "FolioId"`
+
+
+		const respuesta = await client.query(sql, values)
+
+			NuevoPrecioVentaSinImpuesto = CostoPromedio / (1-(Margen/100))
+			IVAMonto = (NuevoPrecioVentaSinImpuesto * (IVAVenta/100))
+			IEPSMonto = (NuevoPrecioVentaSinImpuesto * (IEPS/100))
+			NuevoPrecioVentaConImpuesto = NuevoPrecioVentaSinImpuesto + IVAMonto + IEPSMonto
 
 
 
+			NuevoPrecioVentaConImpuesto = Math.ceil(NuevoPrecioVentaConImpuesto)
+			NuevoPrecioVentaSinImpuesto = (NuevoPrecioVentaConImpuesto / (1+((parseFloat(IVAVenta)+parseFloat(IEPS))/100))).toFixed(2)
+
+			MargenReal = (NuevoPrecioVentaSinImpuesto - CostoPromedio) / NuevoPrecioVentaSinImpuesto * 100
+
+			//console.log(respuesta.rows[0].FolioId)
+
+			if (CostoCompraAnt <= 0){
+			values = [SucursalId, CodigoId, UnidadesRecibidas,CostoCompra,CostoPromedio,MargenReal,NuevoPrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPSId,IEPS,IEPSMonto,NuevoPrecioVentaConImpuesto,Usuario]
+				sql = `UPDATE inventario_perpetuo
+					SET "UnidadesInventario" = "UnidadesInventario" + $3,
+						"CostoCompra"= $4,
+						"CostoPromedio" = $5,
+						"MargenReal"= $6,
+						"PrecioVentaSinImpuesto" = $7,
+						"IVAId" = $8,
+						"IVA" = $9,
+						"IVAMonto" = $10,
+						"IEPSId" = $11,
+						"IEPS" = $12,
+						"IEPSMonto" = $13,
+						"PrecioVentaConImpuesto" = $14,
+						"FechaCambioPrecio" = NOW(),
+						"FechaUltimaCompra" = NOW(),
+						"CostoBasePrecioVenta" = $5,
+						"FechaHora" = NOW(),
+						"Usuario" = $15
+					WHERE "SucursalId" = $1 AND "CodigoId" = $2
+				`
+
+			}else{
+			values = [SucursalId, CodigoId, UnidadesRecibidas,CostoCompra,CostoPromedio,MargenReal,Usuario]
+				sql = `UPDATE inventario_perpetuo
+					SET "UnidadesInventario" = "UnidadesInventario" + $3,
+						"CostoCompra" = $4,
+						"CostoPromedio" = $5,
+						"MargenReal" = $6,
+						"FechaUltimaCompra" = NOW(),
+						"FechaHora" = NOW(),
+						"Usuario" = $7
+					WHERE "SucursalId" = $1 AND "CodigoId" = $2
+				`
+			}
+				await client.query(sql,values)
 		}
-
 
 
 		await client.query('COMMIT')
@@ -571,7 +703,7 @@ app.get('/api/consultaProductosRecientes',authenticationToken, async(req, res)=>
 
 app.get('/api/productodescripcion/:id',authenticationToken, async(req, res) =>{
 	const id = req.params.id
-	const sql = `SELECT vwpd."CodigoId", vwpd."Descripcion",p."IVAId",ii."Descripcion" AS "IVADescripcion",ii."IVA",p."IEPSId",ie."Descripcion" AS "IEPSDescripcion", ie."IEPS"
+	const sql = `SELECT vwpd."CodigoId", vwpd."Descripcion",p."IVAId",ii."Descripcion" AS "IVADescripcion",ii."IVA",p."IEPSId",ie."Descripcion" AS "IEPSDescripcion", ie."IEPS",p."IVACompra"
 			FROM vw_productos_descripcion vwpd
 			INNER JOIN productos p ON p."CodigoId" = vwpd."CodigoId"
 			INNER JOIN impuestos_iva ii ON ii."IVAId" = p."IVAId"
