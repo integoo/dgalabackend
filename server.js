@@ -52,7 +52,7 @@ app.post('/login',async (req, res)=>{
 	let response;
 	let hashPassword;
 	let values = [user]
-	let sql = `SELECT "Password","ColaboradorId" FROM colaboradores WHERE "User" = $1 UNION ALL SELECT '0','0'`
+	let sql = `SELECT "Password","ColaboradorId","SucursalId" FROM colaboradores WHERE "User" = $1 UNION ALL SELECT '0','0','0'`
 	try{
 		response = await pool.query(sql, values)
 	  	hashPassword = response.rows
@@ -79,7 +79,7 @@ app.post('/login',async (req, res)=>{
 
 		//res.send('User :'+ user + ' Password : '+ password + ' hashPassword : '+ hashPassword[0].Password)
 		//res.status(200).json({ "user": user, "accessToken": accessToken})
-		res.status(200).json({ "error":'', "user": user, "accessToken": accessToken, "ColaboradorId": hashPassword[0].ColaboradorId})
+		res.status(200).json({ "error":'', "user": user, "accessToken": accessToken, "ColaboradorId": hashPassword[0].ColaboradorId, "SucursalId": hashPassword[0].SucursalId})
 	}else{
 		//res.status(401).send("Password Incorrecto") 
 		res.status(401).json({"error":"Password Incorrecto"}) 
