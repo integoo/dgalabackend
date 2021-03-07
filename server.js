@@ -479,7 +479,7 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 })
 
 app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>{
-	const { SucursalId, UnidadDeNegocioId, ProveedorId,IVAProveedor, NumeroFactura, TotalFactura, SocioId,Usuario, detalles } = req.body
+	const { SucursalId, ProveedorId,IVAProveedor, NumeroFactura, TotalFactura, SocioId,Usuario, detalles } = req.body
 	//console.log(detalles[0].CodigoId)
 
 	const client = await pool.connect();
@@ -505,6 +505,7 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 			let PrecioVentaConImpuesto = 0.0
 			let NuevoPrecioVentaSinImpuesto = 0.0 
 			let NuevoPrecioVentaConImpuesto = 0.0
+			let respuesta;
 
 			let SocioPagoStatus = 'P'
 
@@ -579,12 +580,11 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 				SocioPagoStatus = 'C'
 			}
 
-		values=[SucursalId,UnidadDeNegocioId,FolioId,Secuencial,Status,ProveedorId,NumeroFactura,TotalFactura,SocioId,SocioPagoStatus,"NOW()",CategoriaId,SubcategoriaId,CodigoId,CodigoBarras,UnidadesRecibidas,UnidadesInventarioAntes,UnidadesInventarioDespues,CostoCompraSinImpuestos,IVACostoCompra,IVAProveedor,IEPSCostoCompra,IEPS,CostoCompra,CostoPromedio,CostoCompraAnt,CostoPromedioAnt,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,ColaboradorId,"NOW()"]
+		values=[SucursalId,FolioId,Secuencial,Status,ProveedorId,NumeroFactura,TotalFactura,SocioId,SocioPagoStatus,"NOW()",CategoriaId,SubcategoriaId,CodigoId,CodigoBarras,UnidadesRecibidas,UnidadesInventarioAntes,UnidadesInventarioDespues,CostoCompraSinImpuestos,IVACostoCompra,IVAProveedor,IEPSCostoCompra,IEPS,CostoCompra,CostoPromedio,CostoCompraAnt,CostoPromedioAnt,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,ColaboradorId,"NOW()"]
 
 
 		sql = `INSERT INTO compras 
 		("SucursalId",
-		"UnidadDeNegocioId",
 		"FolioId",
 		"Secuencial",
 		"Status",
@@ -614,11 +614,11 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 		"PrecioVentaConImpuesto",
 		"ColaboradorId",
 		"FechaHora")
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
 		RETURNING "FolioId"`
 
 
-		const respuesta = await client.query(sql, values)
+		respuesta = await client.query(sql, values)
 
 			NuevoPrecioVentaSinImpuesto = CostoPromedio / (1-(Margen/100))
 			IVAMonto = (NuevoPrecioVentaSinImpuesto * (IVAVenta/100))
@@ -675,7 +675,8 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 
 
 		await client.query('COMMIT')
-		res.status(200).json({"Success": "SI"}) 
+		//res.status(200).json({"Success": "SI"}) 
+		res.status(200).json({"Success": "Folio : "+respuesta.rows[0].FolioId}) 
 	}catch(error){
 		console.log(error.message)
 		await client.query('ROLLBACK')
