@@ -482,6 +482,7 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 	const { SucursalId, ProveedorId,IVAProveedor, NumeroFactura, TotalFactura, SocioId,Usuario, detalles } = req.body
 	//console.log(detalles[0].CodigoId)
 
+
 	const client = await pool.connect();
 			let Secuencial = 0 
 			let Status = 'R'
@@ -626,16 +627,19 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 			NuevoPrecioVentaConImpuesto = NuevoPrecioVentaSinImpuesto + IVAMonto + IEPSMonto
 
 
-
 			NuevoPrecioVentaConImpuesto = Math.ceil(NuevoPrecioVentaConImpuesto)
 			NuevoPrecioVentaSinImpuesto = (NuevoPrecioVentaConImpuesto / (1+((parseFloat(IVAVenta)+parseFloat(IEPS))/100))).toFixed(2)
+
+			IVAMonto = (NuevoPrecioVentaSinImpuesto * (IVAVenta/100))
+			IEPSMonto = (NuevoPrecioVentaSinImpuesto * (IEPS/100))
 
 			MargenReal = (NuevoPrecioVentaSinImpuesto - CostoPromedio) / NuevoPrecioVentaSinImpuesto * 100
 
 			//console.log(respuesta.rows[0].FolioId)
 
 			if (CostoCompraAnt <= 0){
-			values = [SucursalId, CodigoId, UnidadesRecibidas,CostoCompra,CostoPromedio,MargenReal,NuevoPrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPSId,IEPS,IEPSMonto,NuevoPrecioVentaConImpuesto,Usuario]
+			values = [SucursalId, CodigoId, UnidadesRecibidas,CostoCompra,CostoPromedio,MargenReal,NuevoPrecioVentaSinImpuesto,IVAId,IVAVenta,IVAMonto,IEPSId,IEPS,IEPSMonto,NuevoPrecioVentaConImpuesto,Usuario]
+			
 				sql = `UPDATE inventario_perpetuo
 					SET "UnidadesInventario" = "UnidadesInventario" + $3,
 						"CostoCompra"= $4,
@@ -934,6 +938,65 @@ app.get('/api/productosdescripcion/:desc',authenticationToken,async(req,res) => 
 		console.log(error.message)
 		res.status(500).json({"error": error.message})
 	}
+})
+
+app.get('/api/comprasconsulta/:SucursalId/:FechaIni/:FechaFin',authenticationToken,async(req,res) => {
+	const SucursalId = req.params.SucursalId
+	const FechaIni = req.params.FechaIni
+	const FechaFin = req.params.FechaFin
+
+	//const values = [SucursalId,FechaIni,FechaFin]
+	const values = [SucursalId]
+	const sql = `
+			SELECT "FolioId","FechaRecepcion",c."ProveedorId",p."Proveedor",c."NumeroFactura",c."TotalFactura",c."SocioId",s."Socio",
+			SUM("UnidadesRecibidas") AS "ExtUnidadesRecibidas",
+			SUM("CostoCompraSinImpuesto"*"UnidadesRecibidas") AS "ExtCostoCompraSinImp",
+			SUM("IVACostoCompra") AS "ExtIVACostoCompra",
+			SUM("IEPSCostoCompra") AS "ExtIEPSCostoCompra",
+			SUM("CostoCompra"*"UnidadesRecibidas") AS "ExtCostoCompra"
+			FROM compras c
+			INNER JOIN proveedores p ON c."ProveedorId" = p."ProveedorId"
+			INNER JOIN socios s ON c."SocioId" = s."SocioId"
+			WHERE "FechaRecepcion" BETWEEN '${FechaIni}' AND '${FechaFin}'
+			AND c."Status" = 'R'
+			AND c."SucursalId" = $1
+			GROUP BY "FolioId","FechaRecepcion",c."ProveedorId",p."Proveedor",c."NumeroFactura",c."TotalFactura",c."SocioId",s."Socio"
+			ORDER BY c."FechaRecepcion",c."FolioId";
+	`
+	try{
+		const response = await pool.query(sql, values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message}) 
+	}
+})
+
+app.get('/api/ventasconsulta/:SucursalId/:FechaIni/:FechaFin',authenticationToken,async (req, res) => {
+	const SucursalId = req.params.SucursalId
+	const FechaIni = req.params.FechaIni
+	const FechaFin = req.params.FechaFin
+
+	const values=[SucursalId, FechaIni, FechaFin]
+	const sql = `SELECT v."FolioId",v."Fecha",SUM(v."UnidadesVendidas") AS "ExtUnidadesVendidas",SUM(v."PrecioVentaSinImpuesto"*v."UnidadesVendidas") AS "ExtPrecioVentaSinImpuesto",SUM(v."IVAMonto"*v."UnidadesVendidas") AS "ExtIVAMonto",SUM(v."IEPSMonto"*v."UnidadesVendidas") AS "ExtIEPSMonto",SUM(v."PrecioVentaConImpuesto"*v."UnidadesVendidas") AS "ExtPrecioVentaConImpuesto"
+			FROM ventas v
+			WHERE v."SucursalId" = $1
+			AND v."Fecha" BETWEEN $2 AND $3
+			GROUP BY v."FolioId",v."Fecha"
+			ORDER BY v."FolioId"
+	`
+
+	try{
+		const response = await pool.query(sql, values) 
+		const data = await response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+
+	}
+
 })
 
 function authenticationToken(req, res, next) {
