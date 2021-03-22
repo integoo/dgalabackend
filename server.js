@@ -52,7 +52,7 @@ app.post('/login',async (req, res)=>{
 	let response;
 	let hashPassword;
 	let values = [user]
-	let sql = `SELECT "Password","ColaboradorId","SucursalId" FROM colaboradores WHERE "User" = $1 UNION ALL SELECT '0','0','0'`
+	let sql = `SELECT "Password","ColaboradorId","SucursalId",'`+process.env.DB_DATABASE+`' AS db_name FROM colaboradores WHERE "User" = $1 UNION ALL SELECT '0','0','0','0'`
 	try{
 		response = await pool.query(sql, values)
 	  	hashPassword = response.rows
@@ -79,7 +79,7 @@ app.post('/login',async (req, res)=>{
 
 		//res.send('User :'+ user + ' Password : '+ password + ' hashPassword : '+ hashPassword[0].Password)
 		//res.status(200).json({ "user": user, "accessToken": accessToken})
-		res.status(200).json({ "error":'', "user": user, "accessToken": accessToken, "ColaboradorId": hashPassword[0].ColaboradorId, "SucursalId": hashPassword[0].SucursalId})
+		res.status(200).json({ "error":'', "user": user, "accessToken": accessToken, "ColaboradorId": hashPassword[0].ColaboradorId, "SucursalId": hashPassword[0].SucursalId,"db_name": hashPassword[0].db_name})
 	}else{
 		//res.status(401).send("Password Incorrecto") 
 		res.status(401).json({"error":"Password Incorrecto"}) 
@@ -456,12 +456,35 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 
 		//arregloSucursales.rows.forEach(async (element)=>{
 		for (let i=0; i < arregloSucursales.rows.length; i++){
-			values=[arregloSucursales.rows[i].SucursalId,CodigoId,0,0.00,0.00,32,0.00,0.00,IVAId,IVA,0.00,IEPSId,IEPS,0.00,0.00,6,2,"now()",null,null,null,0.00]
+			values=[arregloSucursales.rows[i].SucursalId,CodigoId,0,0,0,0.00,0.00,32,0.00,0.00,IVAId,IVA,0.00,IEPSId,IEPS,0.00,0.00,6,2,null,null,null,0.00,"now()",Usuario]
 
-			sql = `INSERT INTO inventario_perpetuo ("SucursalId","CodigoId","UnidadesInventario","CostoCompra","CostoPromedio","Margen","MargenReal",
-			"PrecioVentaSinImpuesto","IVAId","IVA","IVAMonto","IEPSId","IEPS","IEPSMonto","PrecioVentaConImpuesto","Maximo","Minimo","FechaHora","FechaCambioPrecio",
-			"FechaUltimaVenta","FechaUltimaCompra","CostoBasePrecioVenta")
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+			sql = `INSERT INTO inventario_perpetuo (
+			"SucursalId",
+			"CodigoId",
+			"UnidadesInventario",
+			"UnidadesTransito",
+			"UnidadesComprometidas",
+			"CostoCompra",
+			"CostoPromedio",
+			"Margen",
+			"MargenReal",
+			"PrecioVentaSinImpuesto",
+			"IVAId",
+			"IVA",
+			"IVAMonto",
+			"IEPSId",
+			"IEPS",
+			"IEPSMonto",
+			"PrecioVentaConImpuesto",
+			"Maximo",
+			"Minimo",
+			"FechaCambioPrecio",
+			"FechaUltimaVenta",
+			"FechaUltimaCompra",
+			"CostoBasePrecioVenta",
+			"FechaHora",
+			"Usuario")
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
 			`
 			await client.query(sql, values)
 		}
@@ -581,19 +604,20 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 				SocioPagoStatus = 'C'
 			}
 
-		values=[SucursalId,FolioId,Secuencial,Status,ProveedorId,NumeroFactura,TotalFactura,SocioId,SocioPagoStatus,"NOW()",CategoriaId,SubcategoriaId,CodigoId,CodigoBarras,UnidadesRecibidas,UnidadesInventarioAntes,UnidadesInventarioDespues,CostoCompraSinImpuestos,IVACostoCompra,IVAProveedor,IEPSCostoCompra,IEPS,CostoCompra,CostoPromedio,CostoCompraAnt,CostoPromedioAnt,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,ColaboradorId,"NOW()"]
+		values=[SucursalId,FolioId,Secuencial,Status,ProveedorId,NumeroFactura,TotalFactura,SocioId,SocioPagoStatus,"NOW()","NOW()",CategoriaId,SubcategoriaId,CodigoId,CodigoBarras,UnidadesRecibidas,UnidadesInventarioAntes,UnidadesInventarioDespues,IVAProveedor,IEPS,CostoCompraSinImpuestos,IVACostoCompra,IEPSCostoCompra,CostoCompra,CostoPromedio,CostoCompraAnt,CostoPromedioAnt,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,ColaboradorId,"NOW()"]
 
 
 		sql = `INSERT INTO compras 
 		("SucursalId",
 		"FolioId",
-		"Secuencial",
+		"SerialId",
 		"Status",
 		"ProveedorId",
 		"NumeroFactura",
 		"TotalFactura",
 		"SocioId",
 		"SocioPagoStatus",
+		"FechaOrden",
 		"FechaRecepcion",
 		"CategoriaId",
 		"SubcategoriaId",
@@ -602,11 +626,11 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 		"UnidadesRecibidas",
 		"UnidadesInventarioAntes",
 		"UnidadesInventarioDespues",
+		"IVAProveedor",
+		"IEPS",
 		"CostoCompraSinImpuesto",
 		"IVACostoCompra",
-		"IVAProveedor",
 		"IEPSCostoCompra",
-		"IEPS",
 		"CostoCompra",
 		"CostoPromedio",
 		"CostoCompraAnt",
@@ -615,7 +639,7 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 		"PrecioVentaConImpuesto",
 		"ColaboradorId",
 		"FechaHora")
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
 		RETURNING "FolioId"`
 
 
@@ -625,11 +649,10 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 			IVAMonto = (NuevoPrecioVentaSinImpuesto * (IVAVenta/100))
 			IEPSMonto = (NuevoPrecioVentaSinImpuesto * (IEPS/100))
 			NuevoPrecioVentaConImpuesto = NuevoPrecioVentaSinImpuesto + IVAMonto + IEPSMonto
-
-
 			NuevoPrecioVentaConImpuesto = Math.ceil(NuevoPrecioVentaConImpuesto)
-			NuevoPrecioVentaSinImpuesto = (NuevoPrecioVentaConImpuesto / (1+((parseFloat(IVAVenta)+parseFloat(IEPS))/100))).toFixed(2)
 
+			//El siguiete código es para calcular el desglose de Margen Real e Impuestos a partir del Precio de Venta Redondeado a siguiente entero
+			NuevoPrecioVentaSinImpuesto = (NuevoPrecioVentaConImpuesto / (1+((parseFloat(IVAVenta)+parseFloat(IEPS))/100))).toFixed(2)
 			IVAMonto = (NuevoPrecioVentaSinImpuesto * (IVAVenta/100))
 			IEPSMonto = (NuevoPrecioVentaSinImpuesto * (IEPS/100))
 
@@ -771,7 +794,7 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 			PrecioVentaSinImpuesto = response.rows[0].PrecioVentaSinImpuesto
 			IVAId = response.rows[0].IVAId
 			IVA = response.rows[0].IVA
-			IVAMonto = 0.0
+			IVAMonto = parseFloat(PrecioVentaSinImpuesto) * parseFloat(IVA/100) 
 			IEPS = response.rows[0].IEPS
 			IEPSMonto = parseFloat(PrecioVentaSinImpuesto) * parseFloat(IEPS/100) 
 			PrecioVentaConImpuesto = detalles[i].PrecioVentaConImpuesto
@@ -783,7 +806,7 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 
 
 
-			values = [SucursalId, FolioId, CodigoId, SerialId, Fecha, FolioCompuesto, Status, CodigoBarras, CategoriaId, SubcategoriaId, UnidadesVendidas,UnidadesInventarioAntes, UnidadesInventarioDespues, CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto,FechaHora, UnidadesDevueltas, FechaDevolucionVenta, CajeroId, VendedorId, ComisionVentaPorcentaje, ComisionVenta,Usuario]
+			values = [SucursalId, FolioId, CodigoId, SerialId, Fecha, FolioCompuesto, Status, CodigoBarras, CategoriaId, SubcategoriaId, UnidadesVendidas,UnidadesInventarioAntes, UnidadesInventarioDespues, CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto, UnidadesDevueltas, FechaDevolucionVenta, CajeroId, VendedorId, ComisionVentaPorcentaje, ComisionVenta,Usuario]
 
 		sql = `INSERT INTO ventas 
 		("SucursalId",
@@ -808,7 +831,6 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 		"IEPS",
 		"IEPSMonto",
 		"PrecioVentaConImpuesto",
-		"FechaHora",
 		"UnidadesDevueltas",
 		"FechaDevolucionVenta",
 		"CajeroId",
@@ -816,7 +838,7 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 		"ComisionVentaPorcentaje",
 		"ComisionVenta",
 		"Usuario")
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
 		RETURNING "FolioId"`
 
 
@@ -893,7 +915,13 @@ app.get('/api/productodescripcion/:id',authenticationToken, async(req, res) =>{
 	const values=[id]
 	try{
 		const response = await pool.query(sql, values)
-		const data = response.rows
+		let data;
+		if(response.rowCount === 0){
+			return res.status(200).json({"error": "Producto No Existe"})
+
+		}else{
+			data = response.rows
+		}
 		res.status(200).json(data)
 	}catch(error){
 		console.log(error.message)
@@ -929,10 +957,13 @@ app.get('/api/productosdescripcion/:desc',authenticationToken,async(req,res) => 
 			WHERE vw."Descripcion" LIKE '%${desc}%'
 	`
 	//const values = [desc]
+	let data = []
 	try{
 		//const response = await pool.query(sql, values)
 		const response = await pool.query(sql)
-		const data = response.rows
+		if(response.rowCount > 0){
+			data = response.rows
+		}
 		res.status(200).json(data)
 	}catch(error){
 		console.log(error.message)
@@ -979,12 +1010,12 @@ app.get('/api/ventasconsulta/:SucursalId/:FechaIni/:FechaFin',authenticationToke
 	const FechaFin = req.params.FechaFin
 
 	const values=[SucursalId, FechaIni, FechaFin]
-	const sql = `SELECT v."FolioId",v."Fecha",SUM(v."UnidadesVendidas") AS "ExtUnidadesVendidas",SUM(v."PrecioVentaSinImpuesto"*v."UnidadesVendidas") AS "ExtPrecioVentaSinImpuesto",SUM(v."IVAMonto"*v."UnidadesVendidas") AS "ExtIVAMonto",SUM(v."IEPSMonto"*v."UnidadesVendidas") AS "ExtIEPSMonto",SUM(v."PrecioVentaConImpuesto"*v."UnidadesVendidas") AS "ExtPrecioVentaConImpuesto"
+	const sql = `SELECT v."Fecha",SUM(v."UnidadesVendidas") AS "ExtUnidadesVendidas",SUM(v."PrecioVentaSinImpuesto"*v."UnidadesVendidas") AS "ExtPrecioVentaSinImpuesto",SUM(v."IVAMonto"*v."UnidadesVendidas") AS "ExtIVAMonto",SUM(v."IEPSMonto"*v."UnidadesVendidas") AS "ExtIEPSMonto",SUM(v."PrecioVentaConImpuesto"*v."UnidadesVendidas") AS "ExtPrecioVentaConImpuesto"
 			FROM ventas v
 			WHERE v."SucursalId" = $1
 			AND v."Fecha" BETWEEN $2 AND $3
-			GROUP BY v."FolioId",v."Fecha"
-			ORDER BY v."FolioId"
+			GROUP BY v."Fecha"
+			ORDER BY v."Fecha"
 	`
 
 	try{
@@ -997,6 +1028,85 @@ app.get('/api/ventasconsulta/:SucursalId/:FechaIni/:FechaFin',authenticationToke
 
 	}
 
+})
+
+app.get('/api/kardex/:SucursalId/:CodigoBarras/:FechaInicial/:FechaFinal',authenticationToken,async(req, res) => {
+	const SucursalId = req.params.SucursalId
+	const CodigoBarras = req.params.CodigoBarras
+	//const FechaInicial = req.params.FechaInicial+" 00:00:00.00000"
+	//const FechaFinal = req.params.FechaFinal+" 23:59:59.99999"
+	const FechaInicial = req.params.FechaInicial+" 00:00:00"
+	const FechaFinal = req.params.FechaFinal+" 23:59:59"
+
+
+	let values = [CodigoBarras]
+	let sql = ""
+	let CodigoId=""
+	let data = []
+	try{
+		sql = `SELECT cb."CodigoId"
+			FROM codigos_barras cb
+			WHERE cb."CodigoBarras" = $1`
+		
+		let response = await pool.query(sql,values)
+		if(response.rowCount > 0){
+			data = await response.rows
+			CodigoId= data[0].CodigoId 
+		}else{
+			res.status(200).json({"error": "Producto No Existe"})
+			return
+		}
+
+
+	values=[SucursalId,CodigoId,FechaInicial,FechaFinal]
+	sql = `SELECT * FROM vw_kardex
+			WHERE "SucursalId" = $1
+			AND "CodigoId" = $2
+			AND "FechaHora" BETWEEN $3 AND $4 
+			ORDER BY "FechaHora","SerialId" DESC
+	`
+		response = await pool.query(sql, values)
+		data = await response.rows
+	res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/inventarioperpetuo/:SucursalId/:CodigoBarras',authenticationToken,async (req, res) => {
+	const SucursalId = req.params.SucursalId
+	let CodigoBarras = req.params.CodigoBarras
+
+	if(CodigoBarras === 'novalor'){
+		CodigoBarras = ""
+	}
+	const values = [SucursalId] 
+	let sql = `
+		SELECT vwpd."CodigoBarras",ip."CodigoId", vwpd."Descripcion",ip."UnidadesInventario", ip."CostoPromedio",
+		SUM(ip."UnidadesInventario"*ip."CostoCompra") AS "ExtCostoPromedio"
+		FROM inventario_perpetuo ip 
+		INNER JOIN vw_productos_descripcion vwpd ON vwpd."CodigoId" = ip."CodigoId" 
+		WHERE ip."SucursalId" = $1 `
+	if(CodigoBarras){
+		sql+=`AND vwpd."CodigoBarras" = '${CodigoBarras}' `
+	}
+		sql+=`GROUP BY vwpd."CodigoBarras",ip."CodigoId",vwpd."Descripcion",ip."UnidadesInventario",ip."CostoPromedio"
+		ORDER BY ip."CodigoId"
+	`
+	try{
+		const response = await pool.query(sql,values)
+		if(response.rowCount > 0){
+			const data = await response.rows	
+			res.status(200).json(data)
+		}else{
+			return res.status(200).json({"error": "Producto No Existe"})
+		}
+
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
 })
 
 function authenticationToken(req, res, next) {
