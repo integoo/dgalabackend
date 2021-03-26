@@ -428,12 +428,19 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 	const { CodigoBarras, Descripcion, CategoriaId, SubcategoriaId, UnidadesCapacidad, MedidaCapacidadId, UnidadesVenta, MedidaVentaId, MarcaId, ColorId,
 	SaborId, IVAId, IVA, IVACompra, IEPSId, IEPS, Usuario } = req.body
 
+
+
+
 	const client = await pool.connect()
 	try{
 		await client.query('BEGIN')
 		let sql = `SELECT COALESCE(MAX("CodigoId"),0)+1 AS "CodigoId" FROM productos`
 		let response = await client.query(sql) 
 		const CodigoId = response.rows[0].CodigoId
+
+		if(CodigoBarras === 'I-CODE'){
+			CodigoBarras = 'I'+CodigoId.toString().padStart(12,0)
+		}
 
 		let values=[CodigoId,CodigoBarras, Descripcion, CategoriaId, SubcategoriaId, UnidadesCapacidad, MedidaCapacidadId, UnidadesVenta, MedidaVentaId, 
 	    		    MarcaId, ColorId, SaborId, IVAId, IVACompra, IEPSId, Usuario]
@@ -490,7 +497,7 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 		}
 
 		await client.query('COMMIT')
-		res.status(200).json({"Success":response.rows[0].CodigoId})
+		res.status(200).json({"Success":response.rows[0].CodigoId+"  Codigo de Barras: "+CodigoBarras})
 
 	}catch(error){
 		console.log(error.message)
