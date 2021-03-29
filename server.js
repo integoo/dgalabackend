@@ -604,7 +604,8 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 			SocioPagoStatus = 'P'
 
 
-			CostoPromedio = ((parseInt(detalles[i].UnidadesRecibidas) * parseFloat(detalles[i].CostoCompra)) + (parseInt(UnidadesInventario)*parseFloat(CostoCompraAnt))) / (parseInt(detalles[i].UnidadesRecibidas) + parseInt(UnidadesInventario))
+			//CostoPromedio = ((parseInt(detalles[i].UnidadesRecibidas) * parseFloat(detalles[i].CostoCompra)) + (parseInt(UnidadesInventario)*parseFloat(CostoCompraAnt))) / (parseInt(detalles[i].UnidadesRecibidas) + parseInt(UnidadesInventario))
+			CostoPromedio = ((parseInt(UnidadesRecibidas) * parseFloat(CostoCompra)) + (parseInt(UnidadesInventario)*parseFloat(CostoCompraAnt))) / (parseInt(UnidadesRecibidas) + parseInt(UnidadesInventario))
 
 			// Si SocioId es igual a uno es que la compra se realizó con dinero de la empresa y el SocioPagoStatus es CERRADO o COBRADO
 			if (SocioId === 1){
@@ -692,15 +693,15 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 				`
 
 			}else{
-			values = [SucursalId, CodigoId, UnidadesRecibidas,CostoCompra,CostoPromedio,MargenReal,Usuario]
+			values = [SucursalId, CodigoId, UnidadesRecibidas,CostoCompra,CostoPromedio,Usuario]
 				sql = `UPDATE inventario_perpetuo
 					SET "UnidadesInventario" = "UnidadesInventario" + $3,
 						"CostoCompra" = $4,
 						"CostoPromedio" = $5,
-						"MargenReal" = $6,
+						"MargenReal" = ("PrecioVentaSinImpuesto" - $5)/"PrecioVentaSinImpuesto" * 100,
 						"FechaUltimaCompra" = NOW(),
 						"FechaHora" = NOW(),
-						"Usuario" = $7
+						"Usuario" = $6
 					WHERE "SucursalId" = $1 AND "CodigoId" = $2
 				`
 			}
@@ -939,7 +940,7 @@ app.get('/api/productodescripcion/:id',authenticationToken, async(req, res) =>{
 app.get('/api/productosventa/:SucursalId/:id',authenticationToken,async (req,res) => {
 	const codbar = req.params.id
 	const suc = req.params.SucursalId
-	const sql = `SELECT vw."CodigoId",vw."Descripcion",ip."PrecioVentaConImpuesto"  FROM vw_productos_descripcion vw
+	const sql = `SELECT vw."CodigoId",vw."Descripcion",ip."PrecioVentaConImpuesto",ip."CostoPromedio" FROM vw_productos_descripcion vw
 			INNER JOIN codigos_barras cb ON cb."CodigoId" = vw."CodigoId"
 			INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = vw."CodigoId"
 			WHERE ip."SucursalId" = $1
