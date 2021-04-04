@@ -1117,6 +1117,72 @@ app.get('/api/inventarioperpetuo/:SucursalId/:CodigoBarras',authenticationToken,
 	}
 })
 
+app.get('/api/ventasfolios/:SucursalId/:Fecha',authenticationToken,async(req, res)=>{
+	const SucursalId = req.params.SucursalId
+	const Fecha = req.params.Fecha
+
+	const sql = `SELECT "FolioId",COUNT(DISTINCT "CodigoId") AS "Productos",SUM("UnidadesVendidas") AS "Unidades",
+			SUM("PrecioVentaConImpuesto"*"UnidadesVendidas") AS "ExtVenta"
+		FROM ventas WHERE "SucursalId"=$1 AND "Fecha" = $2
+			GROUP BY "FolioId"
+			ORDER BY "FolioId"
+	`
+	const values = [SucursalId, Fecha]
+	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+
+})
+
+app.get('/api/ventasticket/:SucursalId/:FolioId',authenticationToken,async(req, res)=>{
+	const SucursalId = req.params.SucursalId
+	const FolioId= req.params.FolioId
+
+	const sql = `SELECT v."CodigoId",vw."Descripcion",SUM(v."UnidadesVendidas") AS "UnidadesVendidas",SUM(v."UnidadesVendidas"* v."PrecioVentaConImpuesto") AS "Venta"
+		FROM ventas v INNER JOIN vw_productos_descripcion vw ON vw."CodigoId" = v."CodigoId"
+		WHERE v."SucursalId"=$1 AND v."FolioId" = $2
+		GROUP BY v."CodigoId",vw."Descripcion"
+	`
+	const values = [SucursalId, FolioId]
+	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+
+})
+
+app.get('/api/ventasconsultafechaproducto/:SucursalId/:FechaInicial/:FechaFinal',authenticationToken,async(req, res) => {
+	const SucursalId = req.params.SucursalId	
+	const FechaInicial = req.params.FechaInicial
+	const FechaFinal = req.params.FechaFinal
+
+	const sql = `SELECT v."CodigoId",v."CodigoBarras",vw."Descripcion",SUM(v."UnidadesVendidas") AS "ExtUnidadesVendidas",
+	SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto") AS "ExtVenta"
+	FROM ventas v INNER JOIN vw_productos_descripcion vw ON v."CodigoId" = vw."CodigoId"
+	WHERE v."SucursalId" = $1 AND v."Fecha" BETWEEN $2 AND $3 
+	GROUP BY v."CodigoId",v."CodigoBarras",vw."Descripcion"
+	ORDER BY "ExtUnidadesVendidas" DESC
+	`
+	const values = [SucursalId,FechaInicial,FechaFinal]
+	try{
+		const response = await pool.query(sql,values)
+		const data = await response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
 function authenticationToken(req, res, next) {
     const authHeader = req.headers['authorization']
     const token = authHeader && authHeader.split(' ')[1]
