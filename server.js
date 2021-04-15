@@ -806,7 +806,7 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 			IEPS = response.rows[0].IEPS
 			IEPSMonto = parseFloat(PrecioVentaSinImpuesto) * parseFloat(IEPS/100) 
 			PrecioVentaConImpuesto = detalles[i].PrecioVentaConImpuesto
-			FechaHora= 'NOW()'
+			//FechaHora= 'NOW()'
 			UnidadesDevueltas = 0
 			FechaDevolucionVenta = null
 			ComisionVentaPorcentaje = 0
@@ -814,7 +814,7 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 
 
 
-			values = [SucursalId, FolioId, CodigoId, SerialId, Fecha, FolioCompuesto, Status, CodigoBarras, CategoriaId, SubcategoriaId, UnidadesVendidas,UnidadesInventarioAntes, UnidadesInventarioDespues, CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto, UnidadesDevueltas, FechaDevolucionVenta, CajeroId, VendedorId, ComisionVentaPorcentaje, ComisionVenta,Usuario]
+			values = [SucursalId, FolioId, CodigoId, SerialId, Fecha, FolioCompuesto, Status, CodigoBarras, CategoriaId, SubcategoriaId, UnidadesVendidas,UnidadesInventarioAntes, UnidadesInventarioDespues, CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto,UnidadesDevueltas, FechaDevolucionVenta, CajeroId, VendedorId, ComisionVentaPorcentaje, ComisionVenta,Usuario]
 
 		sql = `INSERT INTO ventas 
 		("SucursalId",
@@ -1071,7 +1071,7 @@ app.get('/api/kardex/:SucursalId/:CodigoBarras/:FechaInicial/:FechaFinal',authen
 			WHERE "SucursalId" = $1
 			AND "CodigoId" = $2
 			AND "FechaHora" BETWEEN $3 AND $4 
-			ORDER BY "FechaHora","SerialId" DESC
+			ORDER BY "FechaHora" DESC,"SerialId" DESC
 	`
 		response = await pool.query(sql, values)
 		data = await response.rows
@@ -1122,7 +1122,8 @@ app.get('/api/ventasfolios/:SucursalId/:Fecha',authenticationToken,async(req, re
 	const Fecha = req.params.Fecha
 
 	const sql = `SELECT "FolioId",COUNT(DISTINCT "CodigoId") AS "Productos",SUM("UnidadesVendidas") AS "Unidades",
-			SUM("PrecioVentaConImpuesto"*"UnidadesVendidas") AS "ExtVenta"
+			SUM("PrecioVentaConImpuesto"*"UnidadesVendidas") AS "ExtVenta",
+			MAX(CAST("FechaHora" AS VARCHAR)) AS "FechaHora" 
 		FROM ventas WHERE "SucursalId"=$1 AND "Fecha" = $2
 			GROUP BY "FolioId"
 			ORDER BY "FolioId"
@@ -1182,6 +1183,318 @@ app.get('/api/ventasconsultafechaproducto/:SucursalId/:FechaInicial/:FechaFinal'
 		res.status(500).json({"error": error.message})
 	}
 })
+
+app.get('/api/periodoabierto',authenticationToken,async(req,res) => {
+	
+	const sql = `SELECT "Periodo" FROM cierres_mes WHERE "Status" = 'A'
+	`
+	try{
+		const response = await pool.query(sql)
+		if(response.rowCount !== 1){
+			res.status(200).json({"error": "No se encontraron Periodos Abierto"});
+		}else{
+			const data = response.rows
+			res.status(200).json(data)
+		}
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/colaboradoradministrador/:ColaboradorId',authenticationToken,async(req,res) => {
+	const ColaboradorId = req.params.ColaboradorId
+
+	const values = [ColaboradorId] 
+	const sql = `SELECT "Administrador" FROM colaboradores WHERE "ColaboradorId" = $1`
+	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+//app.get('/api/cierremescantidades/:SucursalId/:Periodo',authenticationToken,async(req,res) => {
+app.get('/api/cierremescantidades/:Periodo',authenticationToken,async(req,res) => {
+	//const SucursalId = req.params.SucursalId
+	const Periodo = req.params.Periodo
+
+	try{
+		//const values=[SucursalId,Periodo]
+		const values=[Periodo]
+		/*
+		const sql = `SELECT
+				(SELECT COALESCE(SUM("UnidadesVendidas"*"PrecioVentaConImpuesto"),0) AS "ExtVenta" 
+				 FROM ventas
+				 WHERE "SucursalId" = $1 AND "Fecha" BETWEEN (SELECT DISTINCT "PrimerDiaMes" FROM dim_catalogo_tiempo WHERE "Periodo" = $2)
+				 AND (SELECT DISTINCT "UltimoDiaMes" FROM dim_catalogo_tiempo WHERE "Periodo"= $2)),
+				(SELECT CAST (COALESCE(SUM("CantidadRetiro"),0) AS DEC(12,2)) AS "CantidadRetiro" 
+				 FROM retiros_caja WHERE "SucursalId" = $1 AND "Periodo" = $2
+				 AND "Status" = 'R'
+				 ),
+				(SELECT CAST(COALESCE(SUM("CantidadRetiro"),0) AS DEC(12,2)) AS "CantidadRetiroProceso" 
+                                 FROM retiros_caja WHERE "SucursalId" = $1 AND "Periodo" = $2
+				 AND "Status" = 'P'
+                                 )
+				`
+		*/
+
+
+		const sql = `SELECT s."SucursalId",
+				(SELECT COALESCE(SUM("UnidadesVendidas"*"PrecioVentaConImpuesto"),0) AS "ExtVenta" 
+				 FROM ventas
+				 WHERE "SucursalId" = s."SucursalId" AND "Fecha" BETWEEN (SELECT DISTINCT "PrimerDiaMes" FROM dim_catalogo_tiempo WHERE "Periodo" = $1)
+				 AND (SELECT DISTINCT "UltimoDiaMes" FROM dim_catalogo_tiempo WHERE "Periodo"= $1)),
+				(SELECT CAST (COALESCE(SUM("CantidadRetiro"),0) AS DEC(12,2)) AS "CantidadRetiro" 
+				 FROM retiros_caja WHERE "SucursalId" = s."SucursalId" AND "Periodo" = $1
+				 AND "Status" = 'R'
+				 ),
+				(SELECT CAST(COALESCE(SUM("CantidadRetiro"),0) AS DEC(12,2)) AS "CantidadRetiroProceso" 
+                                 FROM retiros_caja WHERE "SucursalId" = s."SucursalId" AND "Periodo" = $1
+				 AND "Status" = 'P'
+                                 )
+				 FROM sucursales s WHERE "TipoSucursal" = 'S'
+				 ORDER BY s."SucursalId"
+				`
+
+
+		let response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+	
+})
+
+app.get('/api/fechahoy',authenticationToken,async(req,res) => {
+	try{
+		const sql = `SELECT CURRENT_DATE AS "FechaHoy"`
+		const response = await pool.query(sql)
+		const data = response.rows
+
+		res.status(200).json(data)
+
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+//app.get('/api/consultaretiros/:SucursalId/:Periodo',authenticationToken,async(req,res) => {
+app.get('/api/consultaretiros/:Periodo',authenticationToken,async(req,res) => {
+	//const SucursalId = req.params.SucursalId
+	const Periodo = req.params.Periodo
+
+	try{
+
+
+
+	/*	
+	 	const sql = `SELECT rc."FolioId",rc."CantidadRetiro",rc."FechaHoraGenera", rc."FechaHoraRecibe", rc."FechaHoraCancela",
+				c1."User" AS "UserGenera",
+				c2."User" AS "UserRecibe",
+				c3."User" AS "UserCancela",
+				rc."Status"
+				FROM retiros_caja rc 
+				LEFT JOIN colaboradores c1 ON rc."ColaboradorIdGenera" = c1."ColaboradorId"
+				LEFT JOIN colaboradores c2 ON rc."ColaboradorIdRecibe" = c2."ColaboradorId"
+				LEFT JOIN colaboradores c3 ON rc."ColaboradorIdCancela" = c3."ColaboradorId"
+				WHERE rc."SucursalId" = $1
+				AND "Periodo" = $2
+				ORDER BY "FolioId"
+				`
+	*/
+
+
+	 	const sql = `SELECT rc."SucursalId",rc."FolioId",rc."CantidadRetiro",
+				TO_CHAR(rc."FechaHoraGenera", 'yyyy-MM-dd HH24:MI:SS') AS "FechaHoraGenera", 
+				TO_CHAR(rc."FechaHoraRecibe", 'yyyy-MM-dd HH24:MI:SS') AS "FechaHoraRecibe", 
+				TO_CHAR(rc."FechaHoraCancela", 'yyyy-MM-dd HH24:MI:SS') AS "FechaHoraCancela", 
+				c1."User" AS "UserGenera",
+				c2."User" AS "UserRecibe",
+				c3."User" AS "UserCancela",
+				rc."Status"
+				FROM retiros_caja rc 
+				INNER JOIN colaboradores c1 ON rc."ColaboradorIdGenera" = c1."ColaboradorId"
+				LEFT JOIN colaboradores c2 ON rc."ColaboradorIdRecibe" = c2."ColaboradorId"
+				LEFT JOIN colaboradores c3 ON rc."ColaboradorIdCancela" = c3."ColaboradorId"
+				WHERE "Periodo" = $1
+				ORDER BY rc."SucursalId",rc."FolioId"
+				`
+
+		//const values = [SucursalId, Periodo]
+		const values = [Periodo]
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.post('/api/cargaretiros',authenticationToken,async(req,res) => {
+	const SucursalId = req.body.SucursalId
+	const Retiro = req.body.Retiro
+	const Periodo = req.body.Periodo
+	const ColaboradorId = req.body.ColaboradorId
+	const Usuario = req.body.Usuario
+
+	const client = await pool.connect()
+	let response;
+	let values;
+	let sql;
+
+	try{
+		await client.query('BEGIN')
+		values=[SucursalId]
+		sql = `SELECT COALESCE(MAX("FolioId"),0)+1 AS "FolioId" FROM retiros_caja WHERE "SucursalId" = $1`
+		response = await pool.query(sql,values)
+		const FolioId = response.rows[0].FolioId
+
+		values=[Periodo]
+		sql = `SELECT "PrimerDiaMes" FROM dim_catalogo_tiempo WHERE "Periodo" = $1 `
+		response = await pool.query(sql,values)
+		const PrimerDiaMes = response.rows[0].PrimerDiaMes
+
+		values = [FolioId,SucursalId,Periodo,PrimerDiaMes,"NOW()",Retiro,"P",ColaboradorId,null,null,null,null,Usuario,"NOW()"]
+		sql = `INSERT INTO retiros_caja ("FolioId","SucursalId","Periodo","PrimerDiaMes","FechaHoraGenera","CantidadRetiro","Status","ColaboradorIdGenera",
+				"ColaboradorIdRecibe","FechaHoraRecibe","ColaboradorIdCancela","FechaHoraCancela","Usuario","FechaHora")
+				VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+				RETURNING "FolioId","SucursalId"
+				`
+		response = await pool.query(sql, values)
+		await pool.query('COMMIT')
+		res.status(201).json({"message":"Success!!!","SucursalId":response.rows[0].SucursalId,"FolioId":response.rows[0].FolioId})
+	}catch(error){
+		console.log(error.message)
+		await pool.query('ROLLBACK') 
+		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
+	}
+})
+
+app.post('/api/aceptaretiro',authenticationToken,async(req,res) => {
+	const SucursalId = req.body.SucursalId
+	const FolioId = req.body.FolioId
+	const ColaboradorId = req.body.ColaboradorId
+	const Usuario = req.body.Usuario
+
+	const client = await pool.connect()
+	try{
+		await pool.query('BEGIN')
+
+		const values = [SucursalId, FolioId, ColaboradorId, Usuario]
+
+		const sql = `UPDATE retiros_caja 
+				SET "Status" = 'R', "ColaboradorIdRecibe" = $3,"FechaHoraRecibe" = NOW(),"Usuario"= $4, "FechaHora" = NOW()
+				WHERE "SucursalId" = $1
+				AND "FolioId" = $2
+				AND "Status" = 'P'
+				`
+		await pool.query(sql, values)
+		await pool.query('COMMIT')
+		res.status(200).json({"message": "Success!!!"})
+	}catch(error){
+		console.log(error.message)
+		await pool.query('ROLLBACK')
+		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
+	}
+})
+
+app.post('/api/cancelaretiro',authenticationToken,async(req,res) => {
+	const SucursalId = req.body.SucursalId
+	const FolioId = req.body.FolioId
+	const ColaboradorId = req.body.ColaboradorId
+	const Usuario = req.body.Usuario
+
+	const client = await pool.connect()
+	try{
+		await pool.query('BEGIN')
+		const values = [SucursalId,FolioId,ColaboradorId,Usuario]
+		const sql = `UPDATE retiros_caja
+				SET "Status" = 'C', "ColaboradorIdCancela" = $3, "FechaHoraCancela" = CLOCK_TIMESTAMP(), "Usuario"= $4, "FechaHora" = CLOCK_TIMESTAMP()
+				WHERE "SucursalId" = $1
+				AND "FolioId" = $2
+				AND "Status" = 'P'
+				`
+		await pool.query(sql, values)
+		await pool.query('COMMIT')
+		res.status(200).json({"messsage": "Success!!!"})
+	}catch(error){
+		console.log(error.message)
+		await pool.query('ROLLBACK')
+		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
+	}
+})
+
+app.post('/api/cierra-abre-mes-retiros',authenticationToken,async(req, res) => {
+	const Periodo = req.body.Periodo
+	const Usuario = req.body.Usuario
+
+
+	let anio = Periodo.substr(0,4)
+	let mes = Periodo.substr(4,2)
+	
+	//CALCULA EL NUEVO PERIODO A ABRIR
+	let NuevoPerido=0;
+	if(parseInt(mes) !== 12){
+		mes = (parseInt(mes) + 1).toString().padStart(2,"0")
+	}else{
+		mes ="1".padStart(2,"0") 
+		anio = parseInt(anio)+1
+	}
+	NuevoPeriodo = anio.toString()+mes.toString()
+
+
+	const client = await pool.connect()
+	try{
+
+		await pool.query('BEGIN')
+
+		let values = [NuevoPeriodo]
+		let sql = `SELECT DISTINCT "PrimerDiaMes" FROM dim_catalogo_tiempo WHERE "Periodo" = $1`
+		let response = await pool.query(sql, values)
+		const vPrimerDiaMes = response.rows[0].PrimerDiaMes
+
+		values = [Periodo,Usuario]
+
+		sql = `UPDATE cierres_mes 
+			SET "Status" = 'C',
+			"FechaHora" = CLOCK_TIMESTAMP(),
+			"Usuario" = $2
+		WHERE "Status" = 'A'AND "Periodo" = $1
+		`
+		await pool.query(sql,values)
+
+
+		values = [NuevoPeriodo,vPrimerDiaMes,'A',Usuario]
+		sql = `INSERT INTO cierres_mes ("Periodo","PrimerDiaMes","Status","FechaHora","Usuario") VALUES ($1,$2,$3,CLOCK_TIMESTAMP(),$4)`
+	
+		await pool.query(sql,values)
+		await pool.query('COMMIT')
+		res.status(200).json({"message": "Success!!!"})
+
+	}catch(error){
+		console.log(error.message)
+		await pool.query('ROLLBACK')
+		res.status(500).json({"error": error.message})
+	} finally{
+		client.release()
+	}
+})
+
 
 function authenticationToken(req, res, next) {
     const authHeader = req.headers['authorization']
