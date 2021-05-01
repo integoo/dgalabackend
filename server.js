@@ -428,6 +428,7 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 	const { CodigoBarras, Descripcion, CategoriaId, SubcategoriaId, UnidadesCapacidad, MedidaCapacidadId, UnidadesVenta, MedidaVentaId, MarcaId, ColorId,
 	SaborId, IVAId, IVA, IVACompra, IEPSId, IEPS, Usuario } = req.body
 
+	let vCodigoBarras=""
 
 
 
@@ -439,21 +440,23 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 		const CodigoId = response.rows[0].CodigoId
 
 		if(CodigoBarras === 'I-CODE'){
-			CodigoBarras = 'I'+CodigoId.toString().padStart(12,0)
+			vCodigoBarras = 'I'+CodigoId.toString().padStart(12,0)
+		}else{
+			vCodigoBarras = CodigoBarras
 		}
 
-		let values=[CodigoId,CodigoBarras, Descripcion, CategoriaId, SubcategoriaId, UnidadesCapacidad, MedidaCapacidadId, UnidadesVenta, MedidaVentaId, 
+		let values=[CodigoId,vCodigoBarras, Descripcion, CategoriaId, SubcategoriaId, UnidadesCapacidad, MedidaCapacidadId, UnidadesVenta, MedidaVentaId, 
 	    		    MarcaId, ColorId, SaborId, IVAId, IVACompra, IEPSId, Usuario]
 
 		//INSERT productos
 	     	sql = `INSERT INTO productos("CodigoId","CodigoBarras","Descripcion","CategoriaId","SubcategoriaId","UnidadesCapacidad","MedidaCapacidadId",
  	        	   "UnidadesVenta","MedidaVentaId","MarcaId","ColorId","SaborId","IVAId","IVACompra","IEPSId","Usuario","FechaHora") 
- 			   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,now()) RETURNING "CodigoId";
+ 			   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,now()) RETURNING "CodigoId","CodigoBarras";
 		`
 		response = await client.query(sql,values)
 
 		//INSERT codigos_barras
-		values = [CodigoBarras, CodigoId, Usuario]
+		values = [vCodigoBarras, CodigoId, Usuario]
 		sql = `INSERT INTO codigos_barras ("CodigoBarras","CodigoId","FechaHora","Usuario") VALUES ($1,$2,NOW(),$3)`
 		await client.query(sql,values)
 
@@ -497,7 +500,7 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 		}
 
 		await client.query('COMMIT')
-		res.status(200).json({"Success":response.rows[0].CodigoId+"  Codigo de Barras: "+CodigoBarras})
+		res.status(200).json({"Success":response.rows[0].CodigoId+"  Codigo de Barras: "+vCodigoBarras})
 
 	}catch(error){
 		console.log(error.message)
@@ -721,26 +724,44 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 	}
 })
 
+
+function sqlventasinsert(){
+	const sql = `INSERT INTO public.ventas ("SucursalId", "FolioId", "CodigoId", "SerialId", "Fecha", "FolioCompuesto", "Status", "CodigoBarras", "CategoriaId", "SubcategoriaId", "UnidadesVendidas", "UnidadesInventarioAntes", "UnidadesInventarioDespues", "CostoCompra", "CostoPromedio", "PrecioVentaSinImpuesto", "IVAId", "IVA", "IVAMonto", "IEPS", "IEPSMonto", "PrecioVentaConImpuesto", "FechaHora", "UnidadesDevueltas", "FechaDevolucionVenta", "CajeroId", "VendedorId", "ComisionVentaPorcentaje", "ComisionVenta", "Usuario", "ClienteId", "FolioIdInventario", "UnidadesRegistradas", "FechaHoraAlta") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,CLOCK_TIMESTAMP(),$23, $24, $25, $26, $27, $28, $29, $30, $31, $32,CLOCK_TIMESTAMP()) RETURNING "FolioId"`
+
+	//`(1, 1, 10, 3, NULL, '0010000001', 'C', 'I000000000010', 2, 1, 0, 0, 0, 0.5200, 0.5200, 1.85, 1, 0.00, 0.0000, 8.00, 0.1480, 2.00, '2021-04-25 20:08:44.838366', 0, NULL, 0, 0, 0.00, 0.00, 'desarrollo', 0, 0, 1, '2021-04-25 18:35:13.383I333-07')`
+	
+	return sql
+
+}
+
 app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
-	const { SucursalId, CajeroId, VendedorId, Usuario, detalles, NotaId, NotaRespalda,ClienteId } = req.body
-	//console.log(detalles[0].CodigoBarras)
+	const { SucursalId, CajeroId, VendedorId, Usuario, detalles, Status, ClienteId } = req.body
 
 	const client = await pool.connect();
 
-
 	try{
 		await client.query('BEGIN')
-		let sql = `SELECT COALESCE(MAX("FolioId"),0)+1 AS "FolioId" FROM ventas WHERE "SucursalId" = ${SucursalId}`
-		let response = await client.query(sql) 
+		let values=[SucursalId]
+		let sql = `SELECT COALESCE(MAX("FolioId"),0)+1 AS "FolioId" FROM ventas WHERE "SucursalId" = $1`
+		let response = await client.query(sql,values) 
 		const FolioId = response.rows[0].FolioId
+
+		let FolioIdInventario = 0;
+
+		if (Status === 'V'){
+			values = [SucursalId]
+			sql = `SELECT COALESCE(MAX("FolioIdInventario"),0)+1 AS "FolioIdInventario" FROM ventas WHERE "SucursalId" = $1`
+			response = await client.query(sql,values) 
+			FolioIdInventario = response.rows[0].FolioIdInventario
+		}else{
+			FolioIdInventario = 0;
+		}
 
 		const FolioCompuesto = SucursalId.toString().padStart(3, "0")+FolioId.toString().padStart(7, "0") 
 
-
 		let CodigoId = 0
-		let SerialId;
-		let Fecha;
-		let Status;
+		let SerialId = 0;
+		let Fecha="";
 		let CodigoBarras;
 		let CategoriaId;
 		let SubcategoriaId;
@@ -750,6 +771,7 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 		let CostoCompra;
 		let CostoPromedio;
 		let PrecioVentaSinImpuesto;
+		let Inventariable;
 		let IVAId;
 		let IVA;
 		let IVAMonto;
@@ -762,37 +784,64 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 		let ComisionVentaPorcentaje;
 		let ComisionVenta;
 		let respuesta;
+		let UnidadesRegistradas = 0;
 
 
 		for (let i=0; i < detalles.length; i++){
 
-			CodigoId = detalles[i].CodigoId
+			CodigoId = parseInt(detalles[i].CodigoId)
 
-		sql=`SELECT p."CategoriaId",p."SubcategoriaId",ip."UnidadesInventario",ip."CostoCompra",p."IVAId",ii."IVA",p."IEPSId",iie."IEPS",ip."CostoPromedio",ip."Margen",ip."PrecioVentaSinImpuesto"
-			FROM productos p
-			INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = p."CodigoId"
-			INNER JOIN impuestos_iva ii ON ii."IVAId" = p."IVAId"
-			INNER JOIN impuestos_ieps iie ON iie."IEPSId" = p."IEPSId"
-			WHERE ip."SucursalId" = ${SucursalId}  
-			AND  p."CodigoId" = ${CodigoId} 
-		`
-			response = await client.query(sql)
-			SerialId = detalles[i].SerialId 
-			Fecha = 'NOW()'
-			Status = 'V'
-			CodigoBarras =detalles[i].CodigoBarras
+			values = [SucursalId, CodigoId]
+			sql=`SELECT p."CategoriaId",p."SubcategoriaId",ip."UnidadesInventario",ip."CostoCompra",p."IVAId",ii."IVA",p."IEPSId",iie."IEPS",
+				ip."CostoPromedio",ip."Margen",ip."PrecioVentaSinImpuesto",p."Inventariable"
+				FROM productos p
+				INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = p."CodigoId"
+				INNER JOIN impuestos_iva ii ON ii."IVAId" = p."IVAId"
+				INNER JOIN impuestos_ieps iie ON iie."IEPSId" = p."IEPSId"
+				WHERE ip."SucursalId" = $1  
+				AND  p."CodigoId" = $2 
+				`
+			response = await client.query(sql,values)
+
+			CodigoBarras = detalles[i].CodigoBarras
 			CategoriaId = response.rows[0].CategoriaId
 			SubcategoriaId = response.rows[0].SubcategoriaId
-			UnidadesVendidas= detalles[i].UnidadesVendidas
-			UnidadesInventarioAntes = response.rows[0].UnidadesInventario
-			UnidadesInventarioDespues= parseInt(response.rows[0].UnidadesInventario) - parseInt(UnidadesVendidas)
+			UnidadesRegistradas= detalles[i].Unidades
+
+			if (Status === 'V'){ //Venta ya afectando Inventario
+				SerialId = parseInt(detalles[i].SerialId) 
+				Fecha = 'NOW()' //CAMBIARLO POR CURRENT_DATE o formando la fecha con un "new Date()" de nodejs
+				UnidadesVendidas= detalles[i].Unidades;
+				UnidadesInventarioAntes = response.rows[0].UnidadesInventario
+				UnidadesInventarioDespues= parseInt(response.rows[0].UnidadesInventario) - parseInt(UnidadesVendidas)
+			}else{
+				SerialId = i+1 
+				Fecha = null 
+				UnidadesVendidas= 0;
+				UnidadesInventarioAntes = 0 
+				UnidadesInventarioDespues = 0 
+			}
+
 			CostoCompra = response.rows[0].CostoCompra
 			CostoPromedio = response.rows[0].CostoPromedio
-			PrecioVentaSinImpuesto = response.rows[0].PrecioVentaSinImpuesto
+
+
+
+
+			Inventariable = response.rows[0].Inventariable
 			IVAId = response.rows[0].IVAId
 			IVA = response.rows[0].IVA
-			IVAMonto = parseFloat(PrecioVentaSinImpuesto) * parseFloat(IVA/100) 
 			IEPS = response.rows[0].IEPS
+
+
+ 			// CodigoId 65 es el "SERVICIO POR ENCARGO" de lavamatica y se calcula su Precio en base a un % sobre la venta de Productos de CategoriaId = 3
+			if(CodigoId === 65){
+				PrecioVentaSinImpuesto = parseFloat(detalles[i].PrecioVentaConImpuesto) /(1+((parseFloat(IVA) + parseFloat(IEPS))/100))
+			}else{
+				PrecioVentaSinImpuesto = response.rows[0].PrecioVentaSinImpuesto
+			}
+
+			IVAMonto = parseFloat(PrecioVentaSinImpuesto) * parseFloat(IVA/100) 
 			IEPSMonto = parseFloat(PrecioVentaSinImpuesto) * parseFloat(IEPS/100) 
 			PrecioVentaConImpuesto = detalles[i].PrecioVentaConImpuesto
 			//FechaHora= 'NOW()'
@@ -802,134 +851,240 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 			ComisionVenta = 0
 
 
-			values = [SucursalId, FolioId, CodigoId, SerialId, Fecha, FolioCompuesto, Status, CodigoBarras, CategoriaId, SubcategoriaId, UnidadesVendidas,UnidadesInventarioAntes, UnidadesInventarioDespues, CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto,UnidadesDevueltas, FechaDevolucionVenta, CajeroId, VendedorId, ComisionVentaPorcentaje, ComisionVenta,Usuario,ClienteId]
-
-		sql = `INSERT INTO ventas 
-		("SucursalId",
-		"FolioId",
-		"CodigoId",
-		"SerialId",
-		"Fecha",
-		"FolioCompuesto",
-		"Status",
-		"CodigoBarras",
-		"CategoriaId",
-		"SubcategoriaId",
-		"UnidadesVendidas",
-		"UnidadesInventarioAntes",
-		"UnidadesInventarioDespues",
-		"CostoCompra",
-		"CostoPromedio",
-		"PrecioVentaSinImpuesto",
-		"IVAId",
-		"IVA",
-		"IVAMonto",
-		"IEPS",
-		"IEPSMonto",
-		"PrecioVentaConImpuesto",
-		"UnidadesDevueltas",
-		"FechaDevolucionVenta",
-		"CajeroId",
-		"VendedorId",
-		"ComisionVentaPorcentaje",
-		"ComisionVenta",
-		"Usuario",
-		"ClienteId")
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
-		RETURNING "FolioId"`
 
 
-		respuesta = await client.query(sql, values)
 
-			//console.log(respuesta.rows[0].FolioId)
 
+
+			values = [SucursalId, FolioId, CodigoId, SerialId, Fecha, FolioCompuesto, Status, CodigoBarras, CategoriaId, SubcategoriaId, UnidadesVendidas,UnidadesInventarioAntes, UnidadesInventarioDespues, CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto,UnidadesDevueltas, FechaDevolucionVenta, CajeroId, VendedorId, ComisionVentaPorcentaje, ComisionVenta,Usuario,ClienteId,FolioIdInventario,UnidadesRegistradas]
+
+
+			sql = sqlventasinsert()  //Manda llamar el query sql para insertar a la tabla de ventas
+
+			respuesta = await client.query(sql, values)
+
+		if (Status === 'V' && Inventariable === 'S'){
 			values = [SucursalId, CodigoId, UnidadesVendidas,Usuario]
-
-				sql = `UPDATE inventario_perpetuo
-					SET "UnidadesInventario" = "UnidadesInventario" - $3,
-						"FechaUltimaVenta" = NOW(),
-						"FechaHora" = NOW(),
-						"Usuario" = $4
-					WHERE "SucursalId" = $1 AND "CodigoId" = $2
-				`
+			sql = `UPDATE inventario_perpetuo
+				SET "UnidadesInventario" = "UnidadesInventario" - $3,
+					"FechaUltimaVenta" = CURRENT_DATE,
+					"FechaHora" = CLOCK_TIMESTAMP(),
+					"Usuario" = $4
+				WHERE "SucursalId" = $1 AND "CodigoId" = $2
+			`
 
 				await client.query(sql,values)
-
 		}
-
-		//################################## CAMBIA STATUS DE NOTA ABIERTA A VENDIDA #################################
-		//
-	if (parseInt(NotaId) !== parseInt(0)){
-		if (NotaRespalda){
-
-
-		//Inserta respaldo en notas_historia
-				
-		let values = [SucursalId,NotaId,Usuario]
-		let sql = `INSERT INTO notas_historia ("FechaHoraRespaldo","UsuarioRespaldo","SucursalId","NotaId","SerialId","ClienteId",
-				"Status","Fecha","CodigoId","CodigoBarras","Unidades","PrecioVentaConImpuesto","Comentarios","ColaboradorId","FechaHora","Usuario")
-				SELECT 
-				CLOCK_TIMESTAMP(),
-				$3,
-				"SucursalId","NotaId","SerialId","ClienteId","Status","Fecha","CodigoId","CodigoBarras","Unidades","PrecioVentaConImpuesto",
-				"Comentarios","ColaboradorId","FechaHora","Usuario"
-				FROM notas
-				WHERE "SucursalId" = $1
-				AND "NotaId" = $2
-				`
-		await client.query(sql,values)
-
-		//Borra de notas
-		values=[SucursalId,NotaId]
-		sql = `DELETE FROM notas WHERE "SucursalId" = $1 AND "NotaId" = $2 `
-		await client.query(sql,values)
-
-
-		let Unidades = 0
-		//Alta en notas con cambios de nota
-		//for (let i=0; i<arregloNota.length; i++) {
-		for (let i=0; i< detalles.length; i++) {
-			Unidades = 1
-			values=[SucursalId,NotaId,i+1,ClienteId,'A',detalles[i].CodigoId,detalles[i].CodigoBarras,Unidades,detalles[i].PrecioVentaConImpuesto,detalles[i].Comentarios,VendedorId,Usuario]
-
-			sql = `INSERT INTO notas (
-			"SucursalId",
-        		"NotaId",
-        		"SerialId",
-        		"ClienteId",
-        		"Status",
-        		"Fecha",
-        		"CodigoId",
-        		"CodigoBarras",
-        		"Unidades",
-        		"PrecioVentaConImpuesto",
-        		"Comentarios",
-        		"ColaboradorId",
-        		"FechaHora",
-        		"Usuario"
-			) VALUES ($1,$2,$3,$4,$5,CURRENT_DATE,$6,$7,$8,$9,$10,$11,CLOCK_TIMESTAMP(),$12)
-			`
-			await client.query(sql,values)
-		}
-
-			}
-
-			values = [SucursalId,NotaId,CajeroId,Usuario]
-                	sql = `UPDATE notas
-                                SET "Status" = 'V',
-                                "FechaHora" = CLOCK_TIMESTAMP(),
-                                "ColaboradorId" = $3,
-                                "Usuario" = $4 
-                                WHERE "SucursalId" = $1
-                                AND "NotaId" = $2
-                	`
-                	await client.query(sql, values)
-		}
-		//
-		//############################################################################################################
+	}
+		await client.query('COMMIT')
 
 		res.status(200).json({"Success": respuesta.rows[0].FolioId}) 
+	}catch(error){
+		console.log(error.message)
+		await client.query('ROLLBACK')
+		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
+	}
+})
+
+
+app.put('/api/eliminaregistroventapendiente',authenticationToken, async(req, res) =>{
+	const SucursalId = req.body.SucursalId
+	const FolioId = req.body.FolioId
+	const CodigoId = req.body.CodigoId
+	const SerialId = req.body.SerialId
+	const Usuario = req.body.Usuario
+	const ColaboradorId = req.body.ColaboradorId
+
+	const client = await pool.connect()
+
+	try{
+		await client.query('BEGIN')
+		const values = [SucursalId,FolioId,CodigoId,SerialId,Usuario,ColaboradorId]
+		const sql = `UPDATE ventas
+				SET "Status" = 'C',
+					"FechaHora" = CLOCK_TIMESTAMP(),
+					"Usuario" = $5,
+					"VendedorId" = $6,
+					"CajeroId" = $6
+				WHERE "SucursalId" = $1
+				AND "FolioId" = $2
+				AND "CodigoId" = $3
+				AND "SerialId" = $4
+		`
+		const response = await client.query(sql,values)
+
 		await client.query('COMMIT')
+
+		res.status(200).json({"message": "Success!!!"})
+
+	}catch(error){
+		console.log(error.message)
+		await client.query('ROLLBACK')
+		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
+	}
+})
+
+
+app.post('/api/agregaregistroventapendiente',authenticationToken,async(req, res)=>{
+	const { SucursalId, FolioId, ClienteId, CajeroId, VendedorId, SerialId, CodigoId, CodigoBarras, UnidadesRegistradas, PrecioVentaConImpuesto, Usuario } = req.body
+
+	const client = await pool.connect()
+
+	try{
+		await client.query('BEGIN')
+
+
+		let values = [SucursalId,FolioId]
+		let sql = `SELECT MAX("SerialId")+1 AS "SerialId", MAX("FolioCompuesto") AS "FolioCompuesto"
+			FROM ventas  
+			WHERE "SucursalId"= $1 AND "FolioId" = $2`
+
+		let response = await client.query(sql,values)
+		const SerialId = response.rows[0].SerialId
+		const FolioCompuesto = response.rows[0].FolioCompuesto
+
+
+		values = [SucursalId,CodigoId]
+		sql = `SELECT p."CategoriaId",p."SubcategoriaId",ip."CostoCompra",ip."CostoPromedio",ip."PrecioVentaSinImpuesto",
+			ip."IVAId",ip."IVA",ip."IVAMonto",ip."IEPS",ip."IEPSMonto"
+			FROM productos p INNER JOIN inventario_perpetuo ip ON p."CodigoId" = ip."CodigoId"
+			WHERE ip."SucursalId"= $1 AND p."CodigoId" = $2`
+
+		response = await client.query(sql,values)
+
+
+		const CategoriaId = response.rows[0].CategoriaId
+		const SubcategoriaId = response.rows[0].SubcategoriaId
+		const CostoCompra = parseFloat(response.rows[0].CostoCompra)
+		const CostoPromedio = parseFloat(response.rows[0].CostoPromedio)
+		const PrecioVentaSinImpuesto = parseFloat(response.rows[0].PrecioVentaSinImpuesto)
+		const IVAId = response.rows[0].IVAId
+		const IVA = parseFloat(response.rows[0].IVA)
+		const IVAMonto = parseFloat(response.rows[0].IVAMonto)
+		const IEPS = parseInt(response.rows[0].IEPS)
+		const IEPSMonto = parseFloat(response.rows[0].IEPSMonto)
+		
+
+		const Fecha = null
+		const Status = 'P'
+		const UnidadesVendidas = 0
+
+
+		sql = sqlventasinsert()
+
+		values = [SucursalId, FolioId, CodigoId, SerialId,Fecha,FolioCompuesto,Status,CodigoBarras,CategoriaId,SubcategoriaId,UnidadesVendidas,
+			0, 
+			0, CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto,
+			0,
+			Fecha,
+			CajeroId, 
+			VendedorId, 
+			0, 
+			0,Usuario,ClienteId,
+			0,UnidadesRegistradas]
+
+
+		response = await client.query(sql, values)
+		await client.query('COMMIT')
+		res.status(200).json({"message": "Success!!!"})
+	}catch(error){
+		console.log(error.message)
+		await client.query('ROLLBACK')
+		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
+	}
+})
+
+
+app.put('/api/cierraventa',authenticationToken, async(req,res) => {
+	const { SucursalId, FolioId, CajeroId, VendedorId, Usuario } = req.body
+
+
+	let SerialId = 0
+	let CodigoId = 0
+	let UnidadesRegistradas = 0
+	let sql;
+	let response;
+	let data;
+	let values;
+	let UnidadesInventarioAntes = 0
+	let UnidadesInventarioDespues = 0
+	let FolioInventario = 0
+	let Inventariable;
+
+	const client = await pool.connect()
+
+	try{
+
+		values = [SucursalId]
+		sql = `SELECT COALESCE(MAX("FolioIdInventario"),0)+1 AS "FolioIdInventario" FROM ventas WHERE "SucursalId" = $1`
+		response = await client.query(sql,values)
+		const FolioIdInventario = response.rows[0].FolioIdInventario
+
+		values = [SucursalId,FolioId]
+		sql=`SELECT "CodigoId","SerialId","UnidadesRegistradas" FROM ventas
+			WHERE "SucursalId" = $1
+			AND "FolioId" = $2
+			AND "Status" = 'P'
+		`
+		response = await client.query(sql,values)
+
+		let arreglo = response.rows
+
+		await client.query('BEGIN')
+
+		for(let i=0; i<arreglo.length; i++){
+			SerialId = parseInt(arreglo[i].SerialId)
+			CodigoId = parseInt(arreglo[i].CodigoId)
+			UnidadesRegistradas = parseInt(arreglo[i].UnidadesRegistradas)
+
+			values = [SucursalId, CodigoId]
+			sql = `SELECT ip."UnidadesInventario", p."Inventariable"
+			FROM inventario_perpetuo ip INNER JOIN productos p ON ip."CodigoId" = p."CodigoId"
+			WHERE ip."SucursalId" = $1 AND ip."CodigoId" = $2`
+			response = await client.query(sql,values)
+			UnidadesInventarioAntes = response.rows[0].UnidadesInventario
+			Inventariable = response.rows[0].Inventariable
+
+			UnidadesInventarioDespues = parseInt(UnidadesInventarioAntes) - parseInt(UnidadesRegistradas)
+
+			values = [SucursalId,FolioId,CodigoId,SerialId,UnidadesRegistradas,UnidadesInventarioAntes,UnidadesInventarioDespues,parseInt(CajeroId),parseInt(VendedorId),Usuario,FolioIdInventario]
+
+			sql = `UPDATE ventas
+				SET
+				"Status" = 'V',
+				"UnidadesVendidas" = $5,
+				"UnidadesInventarioAntes" = $6,
+				"UnidadesInventarioDespues" = $7,
+				"CajeroId"= $8,
+				"VendedorId" = $9,
+				"Fecha" = CURRENT_DATE,
+				"FechaHora" = CLOCK_TIMESTAMP() ,
+				"Usuario" = $10,
+				"FolioIdInventario" = $11
+			WHERE "SucursalId" = $1 AND "FolioId" = $2 AND "CodigoId" = $3 AND "SerialId" = $4
+			`
+			await client.query(sql,values)
+
+
+			if(Inventariable === 'S'){
+				values = [SucursalId, CodigoId, UnidadesInventarioDespues,Usuario]
+				sql = `UPDATE inventario_perpetuo
+					SET "UnidadesInventario" = $3,
+					"FechaHora" = CLOCK_TIMESTAMP(),
+					"Usuario" = $4
+					WHERE "SucursalId" = $1 AND "CodigoId" = $2
+				`
+				await client.query(sql,values)
+			}
+		}
+			await client.query('COMMIT')
+			res.status(200).json({"message": "Success!!!"})
 	}catch(error){
 		console.log(error.message)
 		await client.query('ROLLBACK')
@@ -941,10 +1096,8 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 })
 
 
-
 app.get('/api/consultaProductosRecientes',authenticationToken, async(req, res)=>{
 
-	//let sql = `SELECT "CodigoId","CodigoBarras","Descripcion" FROM productos ORDER BY "CodigoId" DESC LIMIT 10`
 	let sql = `SELECT "CodigoId","CodigoBarras","Descripcion" FROM vw_productos_descripcion ORDER BY "CodigoId" DESC LIMIT 10`
 
 	try{
@@ -960,7 +1113,8 @@ app.get('/api/consultaProductosRecientes',authenticationToken, async(req, res)=>
 
 app.get('/api/productodescripcion/:id',authenticationToken, async(req, res) =>{
 	const id = req.params.id
-	const sql = `SELECT vwpd."CodigoId", vwpd."Descripcion",p."IVAId",ii."Descripcion" AS "IVADescripcion",ii."IVA",p."IEPSId",ie."Descripcion" AS "IEPSDescripcion", ie."IEPS",p."IVACompra"
+	const sql = `SELECT vwpd."CodigoId", vwpd."Descripcion",p."IVAId",ii."Descripcion" AS "IVADescripcion",ii."IVA",
+			p."IEPSId",ie."Descripcion" AS "IEPSDescripcion", ie."IEPS",p."IVACompra",vwpd."CompraVenta"
 			FROM vw_productos_descripcion vwpd
 			INNER JOIN productos p ON p."CodigoId" = vwpd."CodigoId"
 			INNER JOIN impuestos_iva ii ON ii."IVAId" = p."IVAId"
@@ -986,12 +1140,13 @@ app.get('/api/productodescripcion/:id',authenticationToken, async(req, res) =>{
 app.get('/api/productosdatosventa/:SucursalId/:id',authenticationToken,async (req,res) => {
 	const codbar = req.params.id
 	const suc = req.params.SucursalId
-	const sql = `SELECT vw."CodigoId",vw."Descripcion",ip."PrecioVentaConImpuesto",ip."CostoPromedio" FROM vw_productos_descripcion vw
+	const sql = `SELECT vw."CodigoId",vw."Descripcion",ip."PrecioVentaConImpuesto",ip."CostoPromedio",vw."Inventariable",vw."CompraVenta",vw."CategoriaId" 
+			FROM vw_productos_descripcion vw
 			INNER JOIN codigos_barras cb ON cb."CodigoId" = vw."CodigoId"
 			INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = vw."CodigoId"
 			WHERE ip."SucursalId" = $1
 			AND cb."CodigoBarras" = $2
-
+			AND vw."CompraVenta" IN ('A','V') 
 	`
 	const values = [suc,codbar]
 	try{
@@ -1009,6 +1164,7 @@ app.get('/api/productosdescripcion/:desc',authenticationToken,async(req,res) => 
 	const desc = req.params.desc
 	const sql = `SELECT vw."CodigoId",vw."CodigoBarras",vw."Descripcion" FROM vw_productos_descripcion vw
 			WHERE vw."Descripcion" LIKE '%${desc}%'
+			AND vw."CompraVenta" IN ('A','V')
 	`
 	//const values = [desc]
 	let data = []
@@ -1263,31 +1419,11 @@ app.get('/api/colaboradoradministrador/:ColaboradorId',authenticationToken,async
 	}
 })
 
-//app.get('/api/cierremescantidades/:SucursalId/:Periodo',authenticationToken,async(req,res) => {
 app.get('/api/cierremescantidades/:Periodo',authenticationToken,async(req,res) => {
-	//const SucursalId = req.params.SucursalId
 	const Periodo = req.params.Periodo
 
 	try{
-		//const values=[SucursalId,Periodo]
 		const values=[Periodo]
-		/*
-		const sql = `SELECT
-				(SELECT COALESCE(SUM("UnidadesVendidas"*"PrecioVentaConImpuesto"),0) AS "ExtVenta" 
-				 FROM ventas
-				 WHERE "SucursalId" = $1 AND "Fecha" BETWEEN (SELECT DISTINCT "PrimerDiaMes" FROM dim_catalogo_tiempo WHERE "Periodo" = $2)
-				 AND (SELECT DISTINCT "UltimoDiaMes" FROM dim_catalogo_tiempo WHERE "Periodo"= $2)),
-				(SELECT CAST (COALESCE(SUM("CantidadRetiro"),0) AS DEC(12,2)) AS "CantidadRetiro" 
-				 FROM retiros_caja WHERE "SucursalId" = $1 AND "Periodo" = $2
-				 AND "Status" = 'R'
-				 ),
-				(SELECT CAST(COALESCE(SUM("CantidadRetiro"),0) AS DEC(12,2)) AS "CantidadRetiroProceso" 
-                                 FROM retiros_caja WHERE "SucursalId" = $1 AND "Periodo" = $2
-				 AND "Status" = 'P'
-                                 )
-				`
-		*/
-
 
 		const sql = `SELECT s."SucursalId",
 				(SELECT COALESCE(SUM("UnidadesVendidas"*"PrecioVentaConImpuesto"),0) AS "ExtVenta" 
@@ -1332,31 +1468,10 @@ app.get('/api/fechahoy',authenticationToken,async(req,res) => {
 	}
 })
 
-//app.get('/api/consultaretiros/:SucursalId/:Periodo',authenticationToken,async(req,res) => {
 app.get('/api/consultaretiros/:Periodo',authenticationToken,async(req,res) => {
-	//const SucursalId = req.params.SucursalId
 	const Periodo = req.params.Periodo
 
 	try{
-
-
-
-	/*	
-	 	const sql = `SELECT rc."FolioId",rc."CantidadRetiro",rc."FechaHoraGenera", rc."FechaHoraRecibe", rc."FechaHoraCancela",
-				c1."User" AS "UserGenera",
-				c2."User" AS "UserRecibe",
-				c3."User" AS "UserCancela",
-				rc."Status"
-				FROM retiros_caja rc 
-				LEFT JOIN colaboradores c1 ON rc."ColaboradorIdGenera" = c1."ColaboradorId"
-				LEFT JOIN colaboradores c2 ON rc."ColaboradorIdRecibe" = c2."ColaboradorId"
-				LEFT JOIN colaboradores c3 ON rc."ColaboradorIdCancela" = c3."ColaboradorId"
-				WHERE rc."SucursalId" = $1
-				AND "Periodo" = $2
-				ORDER BY "FolioId"
-				`
-	*/
-
 
 	 	const sql = `SELECT rc."SucursalId",rc."FolioId",rc."CantidadRetiro",
 				TO_CHAR(rc."FechaHoraGenera", 'yyyy-MM-dd HH24:MI:SS') AS "FechaHoraGenera", 
@@ -1373,8 +1488,6 @@ app.get('/api/consultaretiros/:Periodo',authenticationToken,async(req,res) => {
 				WHERE "Periodo" = $1
 				ORDER BY rc."SucursalId",rc."FolioId"
 				`
-
-		//const values = [SucursalId, Periodo]
 		const values = [Periodo]
 		const response = await pool.query(sql,values)
 		const data = response.rows
@@ -1541,90 +1654,21 @@ app.post('/api/cierra-abre-mes-retiros',authenticationToken,async(req, res) => {
 	}
 })
 
-app.post('/api/grabanotas',authenticationToken,async(req,res) => {
-	//const {detalles, totalTicket, SucursalId,ClienteId,Unidades,ColaboradorId,Comentarios,Usuario} = req.body
-	const {detalles, totalTicket, ColaboradorId,Comentarios,Usuario} = req.body
-
-		let SerialId = 0
-		let CodigoId = 0
-		let CodigoBarras = "0"
-		const Status = 'A'
-		let Descripcion = ""
-		let PrecioVentaConImpuesto = 0
-		let TotalTicket = totalTicket 
-		let sql="" 
-		let values=[]
-
-	const client = await pool.connect()
-
-	try {
-		await client.query('BEGIN')
-		
-		//values = [SucursalId]
-		const SucursalId = detalles[0].SucursalId
-		const ClienteId = detalles[0].ClienteId
-		let Unidades = 0
-		
-		values = [SucursalId]
-		sql = `SELECT COALESCE(MAX("NotaId"),0)+1 AS "NotaId" FROM notas WHERE "SucursalId" = $1`
-		const response = await pool.query(sql, values)
-		const NotaId = response.rows[0].NotaId
-
-		for (let i=0; i<detalles.length; i++){
-			SerialId = i+1
-			CodigoId = detalles[i].CodigoId
-			CodigoBarras = detalles[i].CodigoBarras
-			PrecioVentaConImpuesto = detalles[i].PrecioVentaConImpuesto
-			Unidades = detalles[i].Unidades
 
 
-			values = [SucursalId,NotaId,SerialId,ClienteId,Status,CodigoId,CodigoBarras,Unidades,PrecioVentaConImpuesto,Comentarios,ColaboradorId,Usuario]
-			sql = `INSERT INTO notas ("SucursalId","NotaId","SerialId","ClienteId","Status","Fecha","CodigoId","CodigoBarras","Unidades","PrecioVentaConImpuesto",
-					"Comentarios","ColaboradorId","FechaHora","Usuario")
-
-				VALUES (
-				$1,
-				$2,
-				$3,
-				$4,
-				$5,
-				CURRENT_DATE,
-				$6,
-				$7,
-				$8,
-				$9,
-				$10,
-				$11,
-				CLOCK_TIMESTAMP(),
-				$12
-				)
-			`
-				await client.query(sql,values)
-		}
-				await client.query('COMMIT')
-				res.status(200).json({"message": "Success!!!"})
-	}catch(error){
-		console.log(error.message)
-		await client.query('ROLLBACK')
-		res.status(500).json({"error": error.message})
-	}finally{
-		client.release()
-	}
-
-})
-
-app.get('/api/consultanotas/:SucursalId',authenticationToken,async(req,res) =>{
+app.get('/api/consultaventaspendientes/:SucursalId',authenticationToken,async(req,res) =>{
 	const SucursalId = req.params.SucursalId
 	try{
 		const values = [SucursalId]
 
-		const sql = `SELECT n.*,vw."Descripcion",c."Cliente"
-			FROM notas n 
-			INNER JOIN vw_productos_descripcion vw ON n."CodigoId" = vw."CodigoId"
-			INNER JOIN vw_clientes c ON c."ClienteId" = n."ClienteId"
-		WHERE "SucursalId" = $1 AND n."Status" = 'A'
-		ORDER BY n."NotaId",n."SerialId"`
 
+		const sql = `SELECT v."SucursalId",v."FolioId",v."SerialId",v."CodigoId",v."UnidadesRegistradas",v."PrecioVentaConImpuesto",
+				vw."Descripcion",v."ClienteId",c."Cliente",v."Usuario"
+			FROM ventas v 
+			INNER JOIN vw_productos_descripcion vw ON v."CodigoId" = vw."CodigoId"
+			INNER JOIN vw_clientes c ON c."ClienteId" = v."ClienteId"
+		WHERE "SucursalId" = $1 AND v."Status" = 'P'
+		ORDER BY v."SucursalId",v."FolioId",v."SerialId"`
 
 		const response = await pool.query(sql,values)
 		const data = response.rows
@@ -1635,15 +1679,102 @@ app.get('/api/consultanotas/:SucursalId',authenticationToken,async(req,res) =>{
 	}
 })
 
-app.get('/api/consultanotaporfolio/:SucursalId/:NotaId',authenticationToken,async(req,res) =>{
+app.get('/api/consultaventaspendientesarreglo/:SucursalId',authenticationToken,async(req,res) =>{
+	const SucursalId = req.params.SucursalId
+	let FolioId = 0 
+	let ClienteId = 0 
+	let Cliente = "" 
+	let CajeroId = 0 
+	let VendedorId = 0
+	let Usuario = 0 
+	let Status = 'P' 
+
+	let SerialId = 0
+	let CodigoId = 0
+	let Descripcion = ""
+	let UnidadesRegistradas = 0
+	let PrecioVentaConImpuesto = 0
+	let response2;
+	let data2;
+
+	let json;
+	let detalles=[]
+	let arreglo=[]
+	let values=[]
+	let sql=""
+	try{
+		values = [SucursalId]
+
+
+		sql = `SELECT DISTINCT v."SucursalId",v."FolioId",v."ClienteId",c."Cliente",v."CajeroId",v."VendedorId",v."Usuario",'P' AS "Status"
+			FROM ventas v 
+			INNER JOIN vw_productos_descripcion vw ON v."CodigoId" = vw."CodigoId"
+			INNER JOIN vw_clientes c ON c."ClienteId" = v."ClienteId"
+		WHERE "SucursalId" = $1 AND v."Status" = 'P'
+		ORDER BY v."SucursalId",v."FolioId"`
+
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		for (let ii=0; data.length > ii; ii++){
+			FolioId = data[ii].FolioId
+			ClienteId = data[ii].ClienteId
+			Cliente = data[ii].Cliente
+			CajeroId = data[ii].CajeroId
+			VendedorId = data[ii].Vendedor
+			Usuario = data[ii].Usuario
+			Status = data[ii].Status
+
+			values = [SucursalId,FolioId]
+			sql = `SELECT v."SerialId",v."CodigoId",vw."Descripcion",v."UnidadesRegistradas",v."PrecioVentaConImpuesto"
+                        	FROM ventas v
+                        	INNER JOIN vw_productos_descripcion vw ON v."CodigoId" = vw."CodigoId"
+                        	INNER JOIN vw_clientes c ON c."ClienteId" = v."ClienteId"
+                		WHERE "SucursalId" = $1 AND v."FolioId" = $2 
+                		ORDER BY v."SerialId"`
+			response2 = await pool.query(sql,values)
+			data2 = response2.rows
+			for (let i=0; data2.length > i; i++) {
+				json={
+					SerialId: data2[i].SerialId,
+					CodigoId: data2[i].CodigoId,
+					Descripcion: data2[i].Descripcion,
+					UnidadesRegistradas: data2[i].UnidadesRegistradas,
+					PrecioVentaConImpuesto: data2[i].PrecioVentaConImpuesto
+				}
+				detalles.push(json)
+			}
+			json = {
+				SucursalId: SucursalId,
+				FolioId: FolioId,
+				ClienteId: ClienteId,
+				Cliente: Cliente,
+				CajeroId: CajeroId,
+				VendedorId: VendedorId,
+				Usuario: Usuario,
+				Status: Status,
+				detalles: detalles
+			}
+			arreglo.push(json)
+			detalles = []
+		}
+		//res.status(200).json(data)
+		res.status(200).json(arreglo)
+	}catch(error) {
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+
+app.get('/api/consultaventapendienteporfolio/:SucursalId/:NotaId',authenticationToken,async(req,res) =>{
 	const SucursalId = req.params.SucursalId
 	const NotaId = req.params.NotaId
 	try{
 		const values = [SucursalId,NotaId]
-		const sql = `SELECT n.*,vw."Descripcion"
-			FROM notas n 
-			INNER JOIN vw_productos_descripcion vw ON n."CodigoId" = vw."CodigoId"
-			WHERE n."SucursalId" = $1 AND "NotaId"=$2 AND "Status" = 'A' 
+		const sql = `SELECT v.*,vw."Descripcion"
+			FROM ventas v  
+			INNER JOIN vw_productos_descripcion vw ON v."CodigoId" = vw."CodigoId"
+			WHERE v."SucursalId" = $1 AND "FolioId"=$2 AND "Status" = 'P'
 			ORDER BY "SerialId"`
 		const response = await pool.query(sql,values)
 		const data = response.rows
@@ -1654,77 +1785,26 @@ app.get('/api/consultanotaporfolio/:SucursalId/:NotaId',authenticationToken,asyn
 	}
 })
 
-app.post('/api/cancelanota',authenticationToken,async(req,res) => {
+app.post('/api/cancelaventapendiente',authenticationToken,async(req,res) => {
 	const SucursalId = req.body.SucursalId
-	const NotaId = req.body.NotaId
-	const ColaboradorIdModifica = req.body.ColaboradorId
+	const FolioId = req.body.FolioId
+	const ColaboradorId = req.body.ColaboradorId
 	const Usuario = req.body.Usuario
-	const NotaRespalda = req.body.NotaRespalda
-	const detalles = req.body.detalles
 
 	const client = await pool.connect()
 	try{
 		await client.query('BEGIN')
 
-if(NotaRespalda){
-		let values = [SucursalId,NotaId,Usuario]
-		let sql = `INSERT INTO notas_historia ("FechaHoraRespaldo","UsuarioRespaldo","SucursalId","NotaId","SerialId","ClienteId",
-				"Status","Fecha","CodigoId","CodigoBarras","Unidades","PrecioVentaConImpuesto","Comentarios","ColaboradorId","FechaHora","Usuario")
-				SELECT 
-				CLOCK_TIMESTAMP(),
-				$3,
-				"SucursalId","NotaId","SerialId","ClienteId","Status","Fecha","CodigoId","CodigoBarras","Unidades","PrecioVentaConImpuesto",
-				"Comentarios","ColaboradorId","FechaHora","Usuario"
-				FROM notas
-				WHERE "SucursalId" = $1
-				AND "NotaId" = $2
-				`
-		await client.query(sql,values)
-
-		//Borra de notas
-		values=[SucursalId,NotaId]
-		sql = `DELETE FROM notas WHERE "SucursalId" = $1 AND "NotaId" = $2 `
-		await client.query(sql,values)
-
-
-		let Unidades = 0
-		//Alta en notas con cambios de nota
-		//for (let i=0; i<arregloNota.length; i++) {
-		for (let i=0; i< detalles.length; i++) {
-			Unidades = 1
-			values=[SucursalId,NotaId,i+1,ClienteId,'A',detalles[i].CodigoId,detalles[i].CodigoBarras,Unidades,detalles[i].PrecioVentaConImpuesto,detalles[i].Comentarios,VendedorId,Usuario]
-
-			sql = `INSERT INTO notas (
-			"SucursalId",
-        		"NotaId",
-        		"SerialId",
-        		"ClienteId",
-        		"Status",
-        		"Fecha",
-        		"CodigoId",
-        		"CodigoBarras",
-        		"Unidades",
-        		"PrecioVentaConImpuesto",
-        		"Comentarios",
-        		"ColaboradorId",
-        		"FechaHora",
-        		"Usuario"
-			) VALUES ($1,$2,$3,$4,$5,CURRENT_DATE,$6,$7,$8,$9,$10,$11,CLOCK_TIMESTAMP(),$12)
-			`
-			await client.query(sql,values)
-
-
-		}
-}
-
-		const values = [SucursalId,NotaId,ColaboradorIdModifica,Usuario]
-		const sql = `UPDATE notas
+		const values = [SucursalId,FolioId,ColaboradorId,Usuario]
+		const sql = `UPDATE ventas 
 				SET "Status" = 'C',
 				"FechaHora" = CLOCK_TIMESTAMP(),
-				"ColaboradorId" = $3,
+				"CajeroId" = $3,
+				"VendedorId" = $3,
 				"Usuario" = $4 
 				WHERE "SucursalId" = $1
-				AND "NotaId" = $2
+				AND "FolioId" = $2
+				AND "Status" = 'P'
 		`
 		const response = await client.query(sql, values)
 		await client.query('COMMIT')
@@ -1738,73 +1818,7 @@ if(NotaRespalda){
 	}
 })
 
-app.post('/api/respaldaborramodificanota',authenticationToken,async(req,res) =>{
-	const SucursalId = req.body.SucursalId
-	const NotaId = req.body.NotaId
-	const Usuario = req.body.Usuario
-	const ColaboradorId = req.body.ColaboradorId
-	const ClienteId = req.body.ClienteId
-	const arregloNota = req.body.arregloNota
 
-	const client = await pool.connect()
-
-	try{
-		await client.query('BEGIN')
-		let values = [SucursalId,NotaId,Usuario]
-		let sql = `INSERT INTO notas_historia ("FechaHoraRespaldo","UsuarioRespaldo","SucursalId","NotaId","SerialId","ClienteId",
-				"Status","Fecha","CodigoId","CodigoBarras","Unidades","PrecioVentaConImpuesto","Comentarios","ColaboradorId","FechaHora","Usuario")
-				SELECT 
-				CLOCK_TIMESTAMP(),
-				$3,
-				"SucursalId","NotaId","SerialId","ClienteId","Status","Fecha","CodigoId","CodigoBarras","Unidades","PrecioVentaConImpuesto",
-				"Comentarios","ColaboradorId","FechaHora","Usuario"
-				FROM notas
-				WHERE "SucursalId" = $1
-				AND "NotaId" = $2
-				`
-		await client.query(sql,values)
-
-		//Borra de notas
-		values=[SucursalId,NotaId]
-		sql = `DELETE FROM notas WHERE "SucursalId" = $1 AND "NotaId" = $2 `
-		await client.query(sql,values)
-
-
-		let Unidades = 0
-		//Alta en notas con cambios de nota
-		for (let i=0; i<arregloNota.length; i++) {
-			Unidades = 1
-			values=[SucursalId,NotaId,i+1,ClienteId,'A',arregloNota[i].CodigoId,arregloNota[i].CodigoBarras,Unidades,arregloNota[i].PrecioVentaConImpuesto,arregloNota[i].Comentarios,ColaboradorId,Usuario]
-
-			sql = `INSERT INTO notas (
-			"SucursalId",
-        		"NotaId",
-        		"SerialId",
-        		"ClienteId",
-        		"Status",
-        		"Fecha",
-        		"CodigoId",
-        		"CodigoBarras",
-        		"Unidades",
-        		"PrecioVentaConImpuesto",
-        		"Comentarios",
-        		"ColaboradorId",
-        		"FechaHora",
-        		"Usuario"
-			) VALUES ($1,$2,$3,$4,$5,CURRENT_DATE,$6,$7,$8,$9,$10,$11,CLOCK_TIMESTAMP(),$12)
-			`
-			await client.query(sql,values)
-		}
-		await client.query('COMMIT')
-		res.status(200).json({"message": "Success!!!"})
-	}catch(error){
-		console.log(error.message)
-		await client.query('ROLLBACK')
-		res.status(500).json({"error": error.message})
-	}finally{
-		client.release()
-	}
-})
 
 app.get('/api/catalogoclientes',authenticationToken,async(req,res) => {
 
@@ -1834,7 +1848,6 @@ function authenticationToken(req, res, next) {
     })
 }
 
-//const port = process.env.PORT || 3001
 const port = process.env.PORT
 
 if (port === 3001){
