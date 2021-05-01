@@ -1243,8 +1243,6 @@ app.get('/api/ventasconsulta/:SucursalId/:FechaIni/:FechaFin',authenticationToke
 app.get('/api/kardex/:SucursalId/:CodigoBarras/:FechaInicial/:FechaFinal',authenticationToken,async(req, res) => {
 	const SucursalId = req.params.SucursalId
 	const CodigoBarras = req.params.CodigoBarras
-	//const FechaInicial = req.params.FechaInicial+" 00:00:00.00000"
-	//const FechaFinal = req.params.FechaFinal+" 23:59:59.99999"
 	const FechaInicial = req.params.FechaInicial+" 00:00:00"
 	const FechaFinal = req.params.FechaFinal+" 23:59:59"
 
@@ -1848,7 +1846,7 @@ function authenticationToken(req, res, next) {
     })
 }
 
-const port = process.env.PORT
+const port = parseInt(process.env.PORT)
 
 if (port === 3001){
 	app.listen(port, ()=>{console.log(`Server is running.... on Port ${port} PRODUCTION`)})
