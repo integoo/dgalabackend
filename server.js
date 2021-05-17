@@ -52,7 +52,9 @@ app.post('/login',async (req, res)=>{
 	let response;
 	let hashPassword;
 	let values = [user]
-	let sql = `SELECT "Password","ColaboradorId","SucursalId",'`+process.env.DB_DATABASE+`' AS db_name FROM colaboradores WHERE "User" = $1 UNION ALL SELECT '0','0','0','0'`
+	let sql = `SELECT "Password","ColaboradorId","SucursalId",'`+process.env.DB_DATABASE+`' AS db_name,"Administrador"
+			FROM colaboradores 
+			WHERE "User" = $1 UNION ALL SELECT '0','0','0','0','0'`
 	try{
 		response = await pool.query(sql, values)
 	  	hashPassword = response.rows
@@ -79,7 +81,7 @@ app.post('/login',async (req, res)=>{
 
 		//res.send('User :'+ user + ' Password : '+ password + ' hashPassword : '+ hashPassword[0].Password)
 		//res.status(200).json({ "user": user, "accessToken": accessToken})
-		res.status(200).json({ "error":'', "user": user, "accessToken": accessToken, "ColaboradorId": hashPassword[0].ColaboradorId, "SucursalId": hashPassword[0].SucursalId,"db_name": hashPassword[0].db_name})
+		res.status(200).json({ "error":'', "user": user, "accessToken": accessToken, "ColaboradorId": hashPassword[0].ColaboradorId, "SucursalId": hashPassword[0].SucursalId,"db_name": hashPassword[0].db_name,"Administrador":hashPassword[0].Administrador})
 	}else{
 		//res.status(401).send("Password Incorrecto") 
 		res.status(401).json({"error":"Password Incorrecto"}) 
@@ -607,7 +609,6 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 			SocioPagoStatus = 'P'
 
 
-			//CostoPromedio = ((parseInt(detalles[i].UnidadesRecibidas) * parseFloat(detalles[i].CostoCompra)) + (parseInt(UnidadesInventario)*parseFloat(CostoCompraAnt))) / (parseInt(detalles[i].UnidadesRecibidas) + parseInt(UnidadesInventario))
 			CostoPromedio = ((parseInt(UnidadesRecibidas) * parseFloat(CostoCompra)) + (parseInt(UnidadesInventario)*parseFloat(CostoCompraAnt))) / (parseInt(UnidadesRecibidas) + parseInt(UnidadesInventario))
 
 			// Si SocioId es igual a uno es que la compra se realizó con dinero de la empresa y el SocioPagoStatus es CERRADO o COBRADO
@@ -671,7 +672,8 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 
 			//console.log(respuesta.rows[0].FolioId)
 
-			if (CostoCompraAnt <= 0){
+			//if (CostoCompraAnt <= 0){
+			  if (PrecioVentaConImpuesto == 0){
 			values = [SucursalId, CodigoId, UnidadesRecibidas,CostoCompra,CostoPromedio,MargenReal,NuevoPrecioVentaSinImpuesto,IVAId,IVAVenta,IVAMonto,IEPSId,IEPS,IEPSMonto,NuevoPrecioVentaConImpuesto,Usuario]
 			
 				sql = `UPDATE inventario_perpetuo
@@ -726,10 +728,9 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 
 
 function sqlventasinsert(){
-	const sql = `INSERT INTO public.ventas ("SucursalId", "FolioId", "CodigoId", "SerialId", "Fecha", "FolioCompuesto", "Status", "CodigoBarras", "CategoriaId", "SubcategoriaId", "UnidadesVendidas", "UnidadesInventarioAntes", "UnidadesInventarioDespues", "CostoCompra", "CostoPromedio", "PrecioVentaSinImpuesto", "IVAId", "IVA", "IVAMonto", "IEPS", "IEPSMonto", "PrecioVentaConImpuesto", "FechaHora", "UnidadesDevueltas", "FechaDevolucionVenta", "CajeroId", "VendedorId", "ComisionVentaPorcentaje", "ComisionVenta", "Usuario", "ClienteId", "FolioIdInventario", "UnidadesRegistradas", "FechaHoraAlta") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,CLOCK_TIMESTAMP(),$23, $24, $25, $26, $27, $28, $29, $30, $31, $32,CLOCK_TIMESTAMP()) RETURNING "FolioId"`
 
-	//`(1, 1, 10, 3, NULL, '0010000001', 'C', 'I000000000010', 2, 1, 0, 0, 0, 0.5200, 0.5200, 1.85, 1, 0.00, 0.0000, 8.00, 0.1480, 2.00, '2021-04-25 20:08:44.838366', 0, NULL, 0, 0, 0.00, 0.00, 'desarrollo', 0, 0, 1, '2021-04-25 18:35:13.383I333-07')`
-	
+	const sql = `INSERT INTO public.ventas ("SucursalId", "FolioId", "CodigoId", "SerialId", "Fecha", "FolioCompuesto", "Status", "ClienteId","CajeroId","VendedorId","CodigoBarras", "CategoriaId", "SubcategoriaId","FolioIdInventario","UnidadesRegistradas", "UnidadesVendidas", "UnidadesInventarioAntes", "UnidadesInventarioDespues", "CostoCompra", "CostoPromedio", "PrecioVentaSinImpuesto", "IVAId", "IVA", "IVAMonto", "IEPS", "IEPSMonto", "PrecioVentaConImpuesto", "UnidadesDevueltas","FechaDevolucionVenta","ComisionVentaPorcentaje","ComisionVenta","FechaHoraAlta","FechaHora","Usuario") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,$23, $24, $25, $26, $27, $28, $29, $30, $31, CLOCK_TIMESTAMP(), CLOCK_TIMESTAMP(),$32) RETURNING "FolioId"`
+
 	return sql
 
 }
@@ -852,11 +853,7 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 
 
 
-
-
-
-
-			values = [SucursalId, FolioId, CodigoId, SerialId, Fecha, FolioCompuesto, Status, CodigoBarras, CategoriaId, SubcategoriaId, UnidadesVendidas,UnidadesInventarioAntes, UnidadesInventarioDespues, CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto,UnidadesDevueltas, FechaDevolucionVenta, CajeroId, VendedorId, ComisionVentaPorcentaje, ComisionVenta,Usuario,ClienteId,FolioIdInventario,UnidadesRegistradas]
+			values = [SucursalId, FolioId, CodigoId, SerialId, Fecha, FolioCompuesto, Status, ClienteId, CajeroId, VendedorId, CodigoBarras, CategoriaId, SubcategoriaId, FolioIdInventario, UnidadesRegistradas, UnidadesVendidas,UnidadesInventarioAntes, UnidadesInventarioDespues, CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto,UnidadesDevueltas, FechaDevolucionVenta, ComisionVentaPorcentaje, ComisionVenta,Usuario]
 
 
 			sql = sqlventasinsert()  //Manda llamar el query sql para insertar a la tabla de ventas
@@ -976,16 +973,20 @@ app.post('/api/agregaregistroventapendiente',authenticationToken,async(req, res)
 
 		sql = sqlventasinsert()
 
-		values = [SucursalId, FolioId, CodigoId, SerialId,Fecha,FolioCompuesto,Status,CodigoBarras,CategoriaId,SubcategoriaId,UnidadesVendidas,
+
+		values = [SucursalId, FolioId, CodigoId, SerialId,Fecha,FolioCompuesto,Status,ClienteId,CajeroId,VendedorId,CodigoBarras,CategoriaId,SubcategoriaId,
+			0,
+			UnidadesRegistradas,
+			UnidadesVendidas,
 			0, 
-			0, CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto,
+			0, 
+			CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto,
 			0,
 			Fecha,
-			CajeroId, 
-			VendedorId, 
-			0, 
-			0,Usuario,ClienteId,
-			0,UnidadesRegistradas]
+			0,
+			0,
+			Usuario]
+			
 
 
 		response = await client.query(sql, values)
@@ -1119,7 +1120,8 @@ app.get('/api/productodescripcion/:id',authenticationToken, async(req, res) =>{
 			INNER JOIN productos p ON p."CodigoId" = vwpd."CodigoId"
 			INNER JOIN impuestos_iva ii ON ii."IVAId" = p."IVAId"
 			INNER JOIN impuestos_ieps ie ON ie."IEPSId" = p."IEPSId"
-			WHERE vwpd."CodigoBarras" = $1`
+			INNER JOIN codigos_barras cb ON vwpd."CodigoId" = cb."CodigoId"
+			WHERE cb."CodigoBarras" = $1`
 	const values=[id]
 	try{
 		const response = await pool.query(sql, values)
@@ -1161,16 +1163,62 @@ app.get('/api/productosdatosventa/:SucursalId/:id',authenticationToken,async (re
 })
 
 app.get('/api/productosdescripcion/:desc',authenticationToken,async(req,res) => {
-	const desc = req.params.desc
+	const desc = '%'+req.params.desc+'%'
 	const sql = `SELECT vw."CodigoId",vw."CodigoBarras",vw."Descripcion" FROM vw_productos_descripcion vw
-			WHERE vw."Descripcion" LIKE '%${desc}%'
+			WHERE vw."Descripcion" LIKE $1 
 			AND vw."CompraVenta" IN ('A','V')
 	`
-	//const values = [desc]
+	const values = [desc]
 	let data = []
 	try{
-		//const response = await pool.query(sql, values)
-		const response = await pool.query(sql)
+		const response = await pool.query(sql, values)
+		if(response.rowCount > 0){
+			data = response.rows
+		}
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/productodescripcionporcodigobarras/:SucursalId/:CodigoBarras',authenticationToken,async(req,res) => {
+	const SucursalId = parseInt(req.params.SucursalId)
+	const CodigoBarras = req.params.CodigoBarras
+
+	try{
+		const values = [SucursalId,CodigoBarras]
+		const sql = `SELECT vw."Descripcion",ip."UnidadesInventario"
+				FROM vw_productos_descripcion vw 
+				INNER JOIN codigos_barras cb ON vw."CodigoId" = cb."CodigoId"
+				INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = cb."CodigoId"
+				WHERE ip."SucursalId" = $1
+				AND cb."CodigoBarras" = $2
+		`
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/productosdescripcioncompraventa/:SucursalId/:desc',authenticationToken,async(req,res) => {
+	const SucursalId = req.params.SucursalId
+	const desc = '%'+req.params.desc+'%'
+
+
+	const values = [SucursalId,desc]
+	const sql = `SELECT vw."CodigoId",vw."CodigoBarras",vw."Descripcion", ip."UnidadesInventario"
+			FROM vw_productos_descripcion vw 
+			INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = vw."CodigoId"
+			WHERE ip."SucursalId" = $1
+			AND vw."Descripcion" LIKE $2
+	`
+	let data = []
+	try{
+		const response = await pool.query(sql, values)
 		if(response.rowCount > 0){
 			data = response.rows
 		}
@@ -1311,6 +1359,31 @@ app.get('/api/inventarioperpetuo/:SucursalId/:CodigoBarras',authenticationToken,
 			return res.status(200).json({"error": "Producto No Existe"})
 		}
 
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+
+app.get('/api/inventarioperpetuoproductoexistencia/:SucursalId/:CodigoBarras',authenticationToken,async(req, res) => {
+
+	const SucursalId = parseInt(req.params.SucursalId)
+	const CodigoBarras = req.params.CodigoBarras
+
+	try{
+
+		const values = [SucursalId,CodigoBarras]
+		const sql = `SELECT "UnidadesInventario" 
+			FROM inventario_perpetuo ip INNER JOIN codigos_barras cb ON ip."CodigoId" = cb."CodigoId"
+			WHERE ip."SucursalId" = $1
+			AND cb."CodigoBarras" = $2
+		`
+		const response = await pool.query(sql,values)
+
+		const data = response.rows
+
+		res.status(200).json(data)
 	}catch(error){
 		console.log(error.message)
 		res.status(500).json({"error": error.message})
@@ -1826,6 +1899,129 @@ app.get('/api/catalogoclientes',authenticationToken,async(req,res) => {
 		const data = response.rows
 		res.status(200).json(data);
 
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/consultatipoajustes',authenticationToken,async(req,res) => {
+	
+	try{
+		const sql = `SELECT "TipoAjusteId","Ajuste","Movimiento","AfectaCosto"
+				FROM tipo_ajustes WHERE "Aplica" = 'Manual'
+				`
+		const response = await pool.query(sql)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/consultaajustesinventariorecientes/:SucursalId',authenticationToken,async(req,res) => {
+	const SucursalId = req.params.SucursalId
+	try{
+		const values=[SucursalId]
+		const sql = `SELECT ai."FolioId",ta."Ajuste",vw."Descripcion",ai."UnidadesAjustadas",ai."FechaHora"
+				FROM ajustes_inventario ai 
+				INNER JOIN vw_productos_descripcion vw ON ai."CodigoId" = vw."CodigoId"
+				INNER JOIN tipo_ajustes ta ON ai."TipoAjusteId" = ta."TipoAjusteId"
+				WHERE ai."SucursalId" = $1
+				ORDER BY "FolioId" DESC
+				LIMIT 10
+		`
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.post('/api/grabaajustesinventario',authenticationToken,async(req,res) => {
+	const { SucursalId,CodigoBarras,TipoAjusteId,AfectaCosto,UnidadesAjustadas,ColaboradorId,Usuario } = req.body
+
+	const client = await pool.connect()
+	try{
+		let values = [SucursalId,CodigoBarras]
+		let sql = `SELECT p."CodigoId",p."CategoriaId",p."SubcategoriaId",ip."UnidadesInventario",ip."CostoCompra",ip."CostoPromedio",
+				ip."PrecioVentaSinImpuesto",ip."PrecioVentaConImpuesto"
+				FROM productos p
+				INNER JOIN codigos_barras cb ON cb."CodigoId" = p."CodigoId"
+				INNER JOIN inventario_perpetuo ip ON p."CodigoId" = ip."CodigoId"
+				WHERE ip."SucursalId" = $1
+				AND cb."CodigoBarras" = $2
+			`
+		let response = await client.query(sql,values)
+
+		const { CodigoId,CategoriaId,SubcategoriaId,UnidadesInventario,CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,PrecioVentaConImpuesto } = response.rows[0]
+
+		values=[SucursalId]
+		sql = `SELECT COALESCE(MAX("FolioId"),0)+1 AS "FolioId"
+			FROM ajustes_inventario
+			WHERE "SucursalId" = $1
+			`
+		response = await client.query(sql,values)
+		const FolioId = parseInt(response.rows[0].FolioId)
+
+		const UnidadesInventarioAntes = parseInt(UnidadesInventario)
+		const UnidadesInventarioDespues = UnidadesInventarioAntes + parseInt(UnidadesAjustadas)
+
+		await client.query('BEGIN')
+
+		values=[SucursalId,CodigoId,FolioId,CodigoBarras,CategoriaId,SubcategoriaId,TipoAjusteId,AfectaCosto,UnidadesAjustadas,UnidadesInventarioAntes,UnidadesInventarioDespues,parseFloat(CostoCompra),parseFloat(CostoPromedio),parseFloat(PrecioVentaSinImpuesto),parseFloat(PrecioVentaConImpuesto),ColaboradorId,Usuario]
+
+		sql = `INSERT INTO ajustes_inventario("SucursalId","CodigoId","FolioId","CodigoBarras","Fecha","CategoriaId","SubcategoriaId","TipoAjusteId",
+					"AfectaCosto","UnidadesAjustadas","UnidadesInventarioAntes","UnidadesInventarioDespues","CostoCompra","CostoPromedio",
+					"PrecioVentaSinImpuesto","PrecioVentaConImpuesto","ColaboradorId","FechaHora","Usuario")
+				VALUES($1,$2,$3,$4,CURRENT_DATE,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,CLOCK_TIMESTAMP(),$17)
+		`
+		await client.query(sql,values)
+
+		values = [SucursalId,CodigoId,UnidadesInventarioDespues,Usuario]
+		sql = `UPDATE inventario_perpetuo
+ 			SET "UnidadesInventario" = $3,
+				"FechaHora" = CLOCK_TIMESTAMP(),
+				"Usuario" = $4
+			WHERE "SucursalId" = $1
+			AND "CodigoId" = $2
+		`
+		await client.query(sql,values)
+
+		await client.query('COMMIT')
+		res.status(200).json({"message":"OK","FolioId":FolioId});
+	}catch(error){
+		console.log(error.message)
+		await client.query('ROLLBACK')
+		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
+	}
+
+})
+
+app.get('/api/consultaventascategorias/:SucursalId/:FechaInicial/:FechaFinal',authenticationToken,async(req,res)=>{
+	const SucursalId = req.params.SucursalId
+	const FechaInicial = req.params.FechaInicial
+	const FechaFinal = req.params.FechaFinal
+
+	try{
+		const sql = `SELECT c."CategoriaId",c."Categoria",ROUND(COALESCE(SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto"),0),2) AS "ExtVenta"
+				FROM categorias c 
+				LEFT JOIN ventas v ON v."CategoriaId" = c."CategoriaId" AND v."Status" = 'V'
+						AND v."SucursalId" = $1
+						AND v."Fecha" BETWEEN $2 AND $3 
+				WHERE 1=1
+				GROUP BY c."CategoriaId",c."Categoria"
+				ORDER BY c."CategoriaId"
+		`
+		const values = [SucursalId,FechaInicial,FechaFinal]
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
 	}catch(error){
 		console.log(error.message)
 		res.status(500).json({"error": error.message})
