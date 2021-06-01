@@ -431,6 +431,8 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 	SaborId, IVAId, IVA, IVACompra, IEPSId, IEPS, Usuario } = req.body
 
 	let vCodigoBarras=""
+	const Maximo=6
+	const Minimo=3
 
 
 
@@ -468,7 +470,7 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 
 		//arregloSucursales.rows.forEach(async (element)=>{
 		for (let i=0; i < arregloSucursales.rows.length; i++){
-			values=[arregloSucursales.rows[i].SucursalId,CodigoId,0,0,0,0.00,0.00,32,0.00,0.00,IVAId,IVA,0.00,IEPSId,IEPS,0.00,0.00,6,2,null,null,null,0.00,"now()",Usuario]
+			values=[arregloSucursales.rows[i].SucursalId,CodigoId,0,0,0,0.00,0.00,32,0.00,0.00,IVAId,IVA,0.00,IEPSId,IEPS,0.00,0.00,Maximo,Minimo,null,null,null,0.00,"now()",Usuario]
 
 			sql = `INSERT INTO inventario_perpetuo (
 			"SucursalId",
@@ -2100,6 +2102,8 @@ app.post('/api/grabatraspasosalida',authenticationToken,async(req,res) => {
 		let sql = ""
 		let values = []
 		let response;
+		let response1;
+		let response2;
 
 		let SerialId= 0
 		let CodigoId = 0
@@ -2149,6 +2153,22 @@ app.post('/api/grabatraspasosalida',authenticationToken,async(req,res) => {
 		let IVAMonto=0
 		let IEPSMonto=0
 
+		values = [SucursalIdOrigen]
+		sql = `SELECT COALESCE(MAX("FolioIdOrigen"),0) + 1 AS "FolioIdOrigen"
+			FROM traspasos
+			WHERE "SucursalIdOrigen" = $1
+			`
+		response = await client.query(sql,values)
+		FolioIdOrigen = response.rows[0].FolioIdOrigen
+
+		values = [SucursalIdDestino]
+		sql = `SELECT COALESCE(MAX("FolioIdDestino"),0) + 1 AS "FolioIdDestino"
+			FROM traspasos
+			WHERE "SucursalIdDestino"= $1
+			`
+		response = await client.query(sql,values)
+		FolioIdDestino = response.rows[0].FolioIdDestino
+
 		for (let i = 0; i < detallesPost.length;i++){
 			CodigoId = parseInt(detallesPost[i].CodigoId)
 			UnidadesPedidas = parseInt(detallesPost[i].UnidadesPedidas)
@@ -2173,21 +2193,6 @@ app.post('/api/grabatraspasosalida',authenticationToken,async(req,res) => {
 
 			UnidadesInventarioDespuesOrigen = UnidadesInventarioAntesOrigen - UnidadesPedidas
 
-			values = [SucursalIdOrigen]
-			sql = `SELECT COALESCE(MAX("FolioIdOrigen"),0) + 1 AS "FolioIdOrigen"
-				FROM traspasos
-				WHERE "SucursalIdOrigen" = $1
-			`
-			response = await client.query(sql,values)
-			FolioIdOrigen = response.rows[0].FolioIdOrigen
-
-			values = [SucursalIdDestino]
-			sql = `SELECT COALESCE(MAX("FolioIdDestino"),0) + 1 AS "FolioIdDestino"
-				FROM traspasos
-				WHERE "SucursalIdDestino"= $1
-			`
-			response = await client.query(sql,values)
-			FolioIdDestino = response.rows[0].FolioIdDestino
 
 			SerialId= i + 1
 
@@ -2305,18 +2310,16 @@ app.post('/api/grabatraspasosalida',authenticationToken,async(req,res) => {
 				WHERE ip."SucursalId" = $1
 				AND ip."CodigoId" = $2
 			`
-			response = await client.query(sql,values)
-			CostoCompraDestinoAntes = parseFloat(response.rows[0].CostoCompra)
-			CostoPromedioDestinoAntes = parseFloat(response.rows[0].CostoPromedio)
-			PrecioVentaSinImpuestoDestinoAntes = parseFloat(response.rows[0].PrecioVentaSinImpuesto)
-			PrecioVentaConImpuestoDestinoAntes = parseFloat(response.rows[0].PrecioVentaConImpuesto)
-			UnidadesInventarioAntesDestino= parseInt(response.rows[0].UnidadesInventario)
+			response1 = await client.query(sql,values)
+			CostoCompraDestinoAntes = parseFloat(response1.rows[0].CostoCompra)
+			CostoPromedioDestinoAntes = parseFloat(response1.rows[0].CostoPromedio)
+			PrecioVentaSinImpuestoDestinoAntes = parseFloat(response1.rows[0].PrecioVentaSinImpuesto)
+			PrecioVentaConImpuestoDestinoAntes = parseFloat(response1.rows[0].PrecioVentaConImpuesto)
+			UnidadesInventarioAntesDestino= parseInt(response1.rows[0].UnidadesInventario)
 
 			UnidadesInventarioDespuesDestino = UnidadesInventarioAntesDestino + UnidadesRecibidas
 
 			CostoPromedioDestinoDespues = ((UnidadesInventarioAntesDestino * CostoPromedioDestinoAntes) + (UnidadesRecibidas * CostoPromedioOrigen)) / (UnidadesInventarioAntesDestino + UnidadesRecibidas)
-
-
 
 
 
@@ -2331,13 +2334,13 @@ app.post('/api/grabatraspasosalida',authenticationToken,async(req,res) => {
 				       ORDER BY "PrecioVentaConImpuesto" DESC
 				       LIMIT 1
 				`
-				response = await client(sql,values)
-				PrecioVentaSinImpuestoDestinoDespues = parseFloat(response.rows[0].PrecioVentaSinImpuesto)
-				PrecioVentaConImpuestoDestinoDespues = parseFloat(response.rows[0].PrecioVentaConImpuesto)
+				response2 = await client(sql,values)
+				PrecioVentaSinImpuestoDestinoDespues = parseFloat(response2.rows[0].PrecioVentaSinImpuesto)
+				PrecioVentaConImpuestoDestinoDespues = parseFloat(response2.rows[0].PrecioVentaConImpuesto)
 
-				Margen = parseFloat(response.rows[0].Margen)
-				IVA = parseFloat(response.rows[0].IVA)
-				IEPS = parseFloat(response.rows[0].IEPS)
+				Margen = parseFloat(response2.rows[0].Margen)
+				IVA = parseFloat(response2.rows[0].IVA)
+				IEPS = parseFloat(response2.rows[0].IEPS)
 
 				if (PrecioVentaConImpuestoDestinoDespues === 0){
 					PrecioVentaSinImpuestoDestinoDespues = CostoPromedioDestinoDespues / (1-(Margen/100))
@@ -2464,6 +2467,65 @@ app.get('/api/codigobarrasprincipal/:CodigoId',authenticationToken,async(req,res
 		res.status(500).json(data)
 	}
 
+})
+
+app.post('/api/inventariociclico',authenticationToken,async(req,res) => {
+	const { SucursalId,ColaboradorId, Usuario, detalles } = req.body 
+
+	let values;
+	let sql;
+	let response;
+	let FolioId;
+	let CodigoId;
+	let CodigoBarras="";
+	let UnidadesContadas = 0;
+	let UnidadesInventario = 0;
+	let UnidadesDiferencia = 0;
+
+	const client = await pool.connect()
+	try{
+		await client.query('BEGIN')
+
+		values = [SucursalId]
+		sql = `SELECT COALESCE(MAX("FolioId"),0)+1 AS "FolioId" FROM inventario_ciclico
+			WHERE "SucursalId" = $1
+			`
+		response = await client.query(sql,values)
+		FolioId = response.rows[0].FolioId 
+
+
+		for (let i=0;i<detalles.length;i++){
+			CodigoId = detalles[i].CodigoId
+			CodigoBarras = detalles[i].CodigoBarras
+			UnidadesContadas = detalles[i].UnidadesContadas
+			UnidadesInventario = detalles[i].UnidadesInventario
+			UnidadesDiferencia = detalles[i].UnidadesDiferencia
+			
+			values = [SucursalId,FolioId,CodigoId,CodigoBarras,UnidadesContadas,UnidadesInventario,UnidadesDiferencia,ColaboradorId,Usuario]
+			sql = `INSERT INTO inventario_ciclico (
+				"SucursalId",
+ 				"FolioId",
+ 				"CodigoId",
+ 				"CodigoBarras",
+ 				"Fecha",
+ 				"UnidadesContadas",
+ 				"UnidadesInventario",
+ 				"UnidadesDiferencia",
+ 				"ColaboradorId",
+ 				"Usuario",
+ 				"FechaHora"
+				) VALUES ($1,$2,$3,$4,CURRENT_DATE,$5,$6,$7,$8,$9,CLOCK_TIMESTAMP()) RETURNING "FolioId"
+		`
+
+			const response = await client.query(sql,values)
+		}
+		await client.query('COMMIT')
+		res.status(200).json({"message": "Success!!!","FolioId": response.rows[0].FolioId})
+	}catch(error){
+		console.log(error.message)
+		await client.query('ROLLBACK')
+		res.status(500).json({"error": error.message})
+	}
 })
 
 function authenticationToken(req, res, next) {
