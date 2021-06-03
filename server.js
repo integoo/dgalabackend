@@ -800,8 +800,8 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 		let FechaHora;
 		let UnidadesDevueltas;
 		let FechaDevolucionVenta;
-		let ComisionVentaPorcentaje;
-		let ComisionVenta;
+		let ComisionVentaPorcentaje=0;
+		let ComisionVenta=0;
 		let respuesta;
 		let UnidadesRegistradas = 0;
 
@@ -812,7 +812,7 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 
 			values = [SucursalId, CodigoId]
 			sql=`SELECT p."CategoriaId",p."SubcategoriaId",ip."UnidadesInventario",ip."CostoCompra",p."IVAId",ii."IVA",p."IEPSId",iie."IEPS",
-				ip."CostoPromedio",ip."Margen",ip."PrecioVentaSinImpuesto",p."Inventariable"
+				ip."CostoPromedio",ip."Margen",ip."PrecioVentaSinImpuesto",p."Inventariable",p."ComisionVentaPorcentaje"
 				FROM productos p
 				INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = p."CodigoId"
 				INNER JOIN impuestos_iva ii ON ii."IVAId" = p."IVAId"
@@ -854,6 +854,9 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 			}
 
 
+			ComisionVentaPorcentaje = parseFloat(response.rows[0].ComisionVentaPorcentaje)
+
+
 			IVAId = response.rows[0].IVAId
 			IVA = response.rows[0].IVA
 			IEPS = response.rows[0].IEPS
@@ -872,8 +875,10 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 			//FechaHora= 'NOW()'
 			UnidadesDevueltas = 0
 			FechaDevolucionVenta = null
-			ComisionVentaPorcentaje = 0
-			ComisionVenta = 0
+
+			if(ComisionVentaPorcentaje !== 0){
+				ComisionVenta = PrecioVentaSinImpuesto * (ComisionVentaPorcentaje/100) 
+			}
 
 
 
