@@ -848,6 +848,12 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 
 
 			Inventariable = response.rows[0].Inventariable
+			if(Inventariable !== 'S'){
+				UnidadesInventarioAntes = 0 
+				UnidadesInventarioDespues = 0
+			}
+
+
 			IVAId = response.rows[0].IVAId
 			IVA = response.rows[0].IVA
 			IEPS = response.rows[0].IEPS
