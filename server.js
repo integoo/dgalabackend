@@ -669,13 +669,17 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 				`
 				  response = await client.query(sql,values)
 
+				  let banderaActualizaPrecioSucursales = false
+
 
 				  if(parseFloat(response.rows[0].PrecioVentaConImpuesto) > 0){
+				  	banderaActualizaPrecioSucursales = false
 					NuevoPrecioVentaConImpuesto = parseFloat(response.rows[0].PrecioVentaConImpuesto)
 					NuevoPrecioVentaSinImpuesto = NuevoPrecioVentaConImpuesto / (1+((IVAVenta+IEPS)/100)) 
 					IVAMonto = (NuevoPrecioVentaSinImpuesto * (IVAVenta/100))
 					IEPSMonto = (NuevoPrecioVentaSinImpuesto * (IEPS/100))
 				  }else{
+				  	banderaActualizaPrecioSucursales = true 
 					NuevoPrecioVentaSinImpuesto = CostoPromedio / (1-(Margen/100))
 					IVAMonto = (NuevoPrecioVentaSinImpuesto * (IVAVenta/100))
 					IEPSMonto = (NuevoPrecioVentaSinImpuesto * (IEPS/100))
@@ -714,6 +718,22 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 						"Usuario" = $15
 					WHERE "SucursalId" = $1 AND "CodigoId" = $2
 				`
+				await client.query(sql,values)
+
+
+				//Actualiza el Precio de Venta de Otras sucursales que tengan Precio de Venta CERO
+				if (banderaActualizaPrecioSucursales){
+					values = [SucursalId, CodigoId, NuevoPrecioVentaConImpuesto,Usuario]
+					sql = `UPDATE inventario_perpetuo
+						SET "PrecioVentaConImpuesto" = $3,
+						"FechaCambioPrecio" = NOW(),
+						"FechaHora" = NOW(),
+						"Usuario" = $4
+						WHERE "SucursalId" != $1 AND "CodigoId" = $2 AND "PrecioVentaConImpuesto" = 0
+					`
+					await client.query(sql,values)
+
+				}
 
 			}else{
 			values = [SucursalId, CodigoId, UnidadesRecibidas,CostoCompra,CostoPromedio,Usuario]
@@ -727,8 +747,8 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 						"Usuario" = $6
 					WHERE "SucursalId" = $1 AND "CodigoId" = $2
 				`
-			}
 				await client.query(sql,values)
+			}
 		}
 
 
@@ -1171,7 +1191,8 @@ app.get('/api/productodescripcion/:id',authenticationToken, async(req, res) =>{
 app.get('/api/productosdatosventa/:SucursalId/:id',authenticationToken,async (req,res) => {
 	const codbar = req.params.id
 	const suc = req.params.SucursalId
-	const sql = `SELECT vw."CodigoId",vw."Descripcion",ip."PrecioVentaConImpuesto",ip."CostoPromedio",vw."Inventariable",vw."CompraVenta",vw."CategoriaId" 
+	const sql = `SELECT vw."CodigoId",vw."Descripcion",ip."PrecioVentaConImpuesto",ip."CostoPromedio",vw."Inventariable",vw."CompraVenta",vw."CategoriaId",
+			ip."UnidadesInventario" - ip."UnidadesComprometidas" AS "UnidadesDisponibles"
 			FROM vw_productos_descripcion vw
 			INNER JOIN codigos_barras cb ON cb."CodigoId" = vw."CodigoId"
 			INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = vw."CodigoId"
@@ -1191,13 +1212,26 @@ app.get('/api/productosdatosventa/:SucursalId/:id',authenticationToken,async (re
 
 })
 
-app.get('/api/productosdescripcion/:desc',authenticationToken,async(req,res) => {
+app.get('/api/productosdescripcion/:desc/:SucursalId',authenticationToken,async(req,res) => {
 	const desc = '%'+req.params.desc+'%'
+	const SucursalId = req.params.SucursalId
+/*
 	const sql = `SELECT vw."CodigoId",vw."CodigoBarras",vw."Descripcion" FROM vw_productos_descripcion vw
 			WHERE vw."Descripcion" LIKE $1 
 			AND vw."CompraVenta" IN ('A','V')
 	`
-	const values = [desc]
+*/
+
+	const sql = `SELECT vw."CodigoId",vw."CodigoBarras",vw."Descripcion", ip."UnidadesInventario" - ip."UnidadesComprometidas" AS "UnidadesDisponibles",
+				ip."PrecioVentaConImpuesto"
+			FROM vw_productos_descripcion vw INNER JOIN inventario_perpetuo ip ON vw."CodigoId" = ip."CodigoId"
+			WHERE vw."Descripcion" LIKE $1 
+			AND vw."CompraVenta" IN ('A','V')
+			AND ip."SucursalId" = $2
+	`
+
+
+	const values = [desc,SucursalId]
 	let data = []
 	try{
 		const response = await pool.query(sql, values)
