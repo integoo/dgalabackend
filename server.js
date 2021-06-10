@@ -774,7 +774,7 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 
 function sqlventasinsert(){
 
-	const sql = `INSERT INTO public.ventas ("SucursalId", "FolioId", "CodigoId", "SerialId", "Fecha", "FolioCompuesto", "Status", "ClienteId","CajeroId","VendedorId","CodigoBarras", "CategoriaId", "SubcategoriaId","FolioIdInventario","UnidadesRegistradas", "UnidadesVendidas", "UnidadesInventarioAntes", "UnidadesInventarioDespues", "CostoCompra", "CostoPromedio", "PrecioVentaSinImpuesto", "IVAId", "IVA", "IVAMonto", "IEPS", "IEPSMonto", "PrecioVentaConImpuesto", "UnidadesDevueltas","FechaDevolucionVenta","ComisionVentaPorcentaje","ComisionVenta","FechaHoraAlta","FechaHora","Usuario") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,$23, $24, $25, $26, $27, $28, $29, $30, $31, CLOCK_TIMESTAMP(), CLOCK_TIMESTAMP(),$32) RETURNING "FolioId"`
+	const sql = `INSERT INTO public.ventas ("SucursalId", "FolioId", "CodigoId", "SerialId", "Fecha", "FolioCompuesto", "Status", "ClienteId","CajeroId","VendedorId","CodigoBarras", "CategoriaId", "SubcategoriaId","FolioIdInventario","UnidadesRegistradas", "UnidadesVendidas", "UnidadesInventarioAntes", "UnidadesInventarioDespues", "CostoCompra", "CostoPromedio", "PrecioVentaSinImpuesto", "IVAId", "IVA", "IVAMonto", "IEPS", "IEPSMonto", "PrecioVentaConImpuesto", "UnidadesDevueltas","FechaDevolucionVenta","ComisionVentaPorcentaje","ComisionVenta","FechaHoraAlta","FechaHora","Usuario","CostoDeVentas","CostoDeVentasProcesado") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,$23, $24, $25, $26, $27, $28, $29, $30, $31, CLOCK_TIMESTAMP(), CLOCK_TIMESTAMP(),$32,$33,$34) RETURNING "FolioId"`
 
 	return sql
 
@@ -909,7 +909,7 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 
 
 
-			values = [SucursalId, FolioId, CodigoId, SerialId, Fecha, FolioCompuesto, Status, ClienteId, CajeroId, VendedorId, CodigoBarras, CategoriaId, SubcategoriaId, FolioIdInventario, UnidadesRegistradas, UnidadesVendidas,UnidadesInventarioAntes, UnidadesInventarioDespues, CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto,UnidadesDevueltas, FechaDevolucionVenta, ComisionVentaPorcentaje, ComisionVenta,Usuario]
+			values = [SucursalId, FolioId, CodigoId, SerialId, Fecha, FolioCompuesto, Status, ClienteId, CajeroId, VendedorId, CodigoBarras, CategoriaId, SubcategoriaId, FolioIdInventario, UnidadesRegistradas, UnidadesVendidas,UnidadesInventarioAntes, UnidadesInventarioDespues, CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,IVAId,IVA,IVAMonto,IEPS,IEPSMonto,PrecioVentaConImpuesto,UnidadesDevueltas, FechaDevolucionVenta, ComisionVentaPorcentaje, ComisionVenta,Usuario,CostoPromedio,'N']
 
 
 			sql = sqlventasinsert()  //Manda llamar el query sql para insertar a la tabla de ventas
@@ -1041,7 +1041,9 @@ app.post('/api/agregaregistroventapendiente',authenticationToken,async(req, res)
 			Fecha,
 			0,
 			0,
-			Usuario]
+			Usuario,
+			0,
+			'N']
 			
 
 
