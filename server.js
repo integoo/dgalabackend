@@ -519,7 +519,6 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 	const { SucursalId, ProveedorId,IVAProveedor, NumeroFactura, TotalFactura, SocioId,Usuario, detalles } = req.body
 	//console.log(detalles[0].CodigoId)
 
-
 	const client = await pool.connect();
 			let Secuencial = 0 
 			let Status = 'R'
@@ -560,27 +559,35 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 		let IEPSMonto = 0.0
 	try{
 		await client.query('BEGIN')
-		let sql = `SELECT COALESCE(MAX("FolioId"),0)+1 AS "FolioId" FROM compras WHERE "SucursalId" = ${SucursalId}`
-		let response = await client.query(sql) 
+
+
+		values = [SucursalId] 
+		let sql = `SELECT COALESCE(MAX("FolioId"),0)+1 AS "FolioId" FROM compras WHERE "SucursalId" = $1`
+		let response = await client.query(sql,values) 
 		let FolioId = response.rows[0].FolioId
 
-		sql = `SELECT "ColaboradorId" FROM colaboradores WHERE "User" = '${Usuario}' ` 
-		response = await client.query(sql)
+		values = [Usuario]
+		sql = `SELECT "ColaboradorId" FROM colaboradores WHERE "User" = $1 ` 
+		response = await client.query(sql,values)
 		let ColaboradorId = response.rows[0].ColaboradorId
 
 
 		for (let i=0; i < detalles.length; i++){
 
-		sql=`SELECT p."CategoriaId",p."SubcategoriaId",ip."UnidadesInventario",ip."CostoCompra",p."IVAId",ii."IVA",p."IEPSId",iie."IEPS",ip."CostoPromedio",ip."Margen",ip."PrecioVentaSinImpuesto",
+			CodigoId = detalles[i].CodigoId
+
+			values = [SucursalId,CodigoId]
+			sql=`SELECT p."CategoriaId",p."SubcategoriaId",ip."UnidadesInventario",ip."CostoCompra",p."IVAId",ii."IVA",p."IEPSId",iie."IEPS",
+			ip."CostoPromedio",ip."Margen",ip."PrecioVentaSinImpuesto",
 			ip."PrecioVentaConImpuesto"
 			FROM productos p
 			INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = p."CodigoId"
 			INNER JOIN impuestos_iva ii ON ii."IVAId" = p."IVAId"
 			INNER JOIN impuestos_ieps iie ON iie."IEPSId" = p."IEPSId"
-			WHERE ip."SucursalId" = ${SucursalId}  
-			AND  p."CodigoId" = ${detalles[i].CodigoId} 
+			WHERE ip."SucursalId" = $1  
+			AND  p."CodigoId" = $2 
 		`
-			response = await client.query(sql)
+			response = await client.query(sql,values)
 			Secuencial = i + 1
 			Status = 'R'
 			CategoriaId = response.rows[0].CategoriaId
@@ -1432,10 +1439,11 @@ app.get('/api/kardex/:SucursalId/:CodigoBarras/:FechaInicial/:FechaFinal',authen
 	}
 })
 
-app.get('/api/inventarioperpetuo/:SucursalId/:CodigoBarras/:SoloConExistencia',authenticationToken,async (req, res) => {
+app.get('/api/inventarioperpetuo/:SucursalId/:CodigoBarras/:SoloConExistencia/:radiovalue',authenticationToken,async (req, res) => {
 	const SucursalId = req.params.SucursalId
 	let CodigoBarras = req.params.CodigoBarras
 	const SoloConExistencia = req.params.SoloConExistencia
+	const radiovalue = req.params.radiovalue
 	
 
 	if(CodigoBarras === 'novalor'){
@@ -1443,7 +1451,7 @@ app.get('/api/inventarioperpetuo/:SucursalId/:CodigoBarras/:SoloConExistencia',a
 	}
 	const values = [SucursalId] 
 	let sql = `
-		SELECT vwpd."CodigoBarras",ip."CodigoId", vwpd."Descripcion",ip."UnidadesInventario", ip."CostoPromedio",
+		SELECT vwpd."CodigoBarras",ip."CodigoId", vwpd."Descripcion",ip."UnidadesInventario", ip."CostoPromedio",vwpd."CategoriaId",
 		SUM(ip."UnidadesInventario"*ip."CostoCompra") AS "ExtCostoPromedio"
 		FROM inventario_perpetuo ip 
 		INNER JOIN vw_productos_descripcion vwpd ON vwpd."CodigoId" = ip."CodigoId" 
@@ -1455,9 +1463,19 @@ app.get('/api/inventarioperpetuo/:SucursalId/:CodigoBarras/:SoloConExistencia',a
 			sql+=`AND ip."UnidadesInventario" <> 0 `
 		}
 	}
-		sql+=`GROUP BY vwpd."CodigoBarras",ip."CodigoId",vwpd."Descripcion",ip."UnidadesInventario",ip."CostoPromedio"
-		ORDER BY ip."CodigoId"
+		sql+=`GROUP BY vwpd."CodigoBarras",ip."CodigoId",vwpd."Descripcion",ip."UnidadesInventario",ip."CostoPromedio",vwpd."CategoriaId"
 	`
+	if (radiovalue ==="porcodigo"){
+		sql+=`ORDER BY ip."CodigoId"`
+	}
+	if (radiovalue ==="porunidadesinventario"){
+		sql+=`ORDER BY ip."UnidadesInventario" DESC`
+	}
+	if (radiovalue ==="porcategoriaunidadesinventario"){
+		sql+=`ORDER BY vwpd."CategoriaId",ip."UnidadesInventario" DESC`
+	}
+
+
 	try{
 		const response = await pool.query(sql,values)
 		if(response.rowCount > 0){
@@ -2569,6 +2587,36 @@ app.post('/api/inventariociclico',authenticationToken,async(req,res) => {
 	}catch(error){
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		res.status(500).json({"error": error.message})
+	}
+})
+
+
+app.get('/api/ventassucursaleshoy',authenticationToken,async(req,res) => {
+	try{
+		/*
+		const sql = `SELECT s."Sucursal",SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto") AS "ExtVentaConImp"
+			FROM ventas v INNER JOIN sucursales s ON v."SucursalId" = s."SucursalId"
+			WHERE v."Status" = 'V'
+			AND v."Fecha" = CURRENT_DATE
+			GROUP BY s."Sucursal"
+			ORDER BY s."Sucursal"
+		`
+		*/
+
+
+		const sql = `SELECT s."Sucursal",SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto") AS "ExtVentaConImp"
+			FROM vw_ventas_devoventas v INNER JOIN sucursales s ON v."SucursalId" = s."SucursalId"
+			WHERE v."Fecha" = CURRENT_DATE
+			GROUP BY s."Sucursal"
+			ORDER BY s."Sucursal"
+		`
+		const response = await pool.query(sql)
+		const data = response.rows
+
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
 		res.status(500).json({"error": error.message})
 	}
 })
