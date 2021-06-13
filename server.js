@@ -2877,7 +2877,6 @@ app.post('/api/cambiosdepresentacionajustes',authenticationToken,async(req,res) 
 			
 		}else{
 
-
 		        values = [SucursalId,parseInt(CodigoIdHijo),FolioId,CodigoBarrasHijo,CategoriaId,SubcategoriaId,TipoAjusteId,AfectaCosto,parseInt(UnidadesHijoRecibe),UnidadesInventario,UnidadesInventarioDespues,CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,parseInt(ColaboradorId),Usuario]
 
 			sql = `INSERT INTO ajustes_inventario("SucursalId","CodigoId","FolioId","CodigoBarras","Fecha","CategoriaId","SubcategoriaId","TipoAjusteId",
@@ -2889,9 +2888,7 @@ app.post('/api/cambiosdepresentacionajustes',authenticationToken,async(req,res) 
 
 
 
-
-
-			MargenReal = (PrecioVentaSinImpuestos - NuevoCostoPromedio)/ PrecioVentaSinImpuesto
+			MargenReal = (PrecioVentaSinImpuesto - NuevoCostoPromedio)/ PrecioVentaSinImpuesto
 
 			values = [SucursalId,parseInt(CodigoIdHijo),parseInt(UnidadesHijoRecibe),CostoPromedioPadre,NuevoCostoPromedio,MargenReal,Usuario]
 			sql = `UPDATE inventario_perpetuo
