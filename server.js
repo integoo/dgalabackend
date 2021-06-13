@@ -2877,7 +2877,7 @@ app.post('/api/cambiosdepresentacionajustes',authenticationToken,async(req,res) 
 			
 		}else{
 
-		        values = [SucursalId,parseInt(CodigoIdHijo),FolioId,CodigoBarrasHijo,CategoriaId,SubcategoriaId,TipoAjusteId,AfectaCosto,parseInt(UnidadesHijoRecibe),UnidadesInventario,UnidadesInventarioDespues,CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,parseInt(ColaboradorId),Usuario]
+		        values = [SucursalId,parseInt(CodigoIdHijo),FolioId,CodigoBarrasHijo,CategoriaId,SubcategoriaId,TipoAjusteId,AfectaCosto,parseInt(UnidadesHijoRecibe),UnidadesInventario,UnidadesInventarioDespues,CostoPromedioPadre,NuevoCostoPromedio,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,parseInt(ColaboradorId),Usuario]
 
 			sql = `INSERT INTO ajustes_inventario("SucursalId","CodigoId","FolioId","CodigoBarras","Fecha","CategoriaId","SubcategoriaId","TipoAjusteId",
 			"AfectaCosto","UnidadesAjustadas","UnidadesInventarioAntes","UnidadesInventarioDespues","CostoCompra","CostoPromedio","PrecioVentaSinImpuesto",
