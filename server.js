@@ -404,7 +404,7 @@ app.get('/api/catalogos/:id',authenticationToken,async (req,res) => {
 		sql = `SELECT "IEPSId","Descripcion", "IEPS" FROM impuestos_ieps ORDER BY "IEPSId"`
 	}
 	if (id === '10'){
-		sql = `SELECT "SucursalId","Sucursal" FROM sucursales WHERE "Status" = 'A' AND "TipoSucursal" = 'S' ORDER BY "SucursalId"`
+		sql = `SELECT "SucursalId","Sucursal" FROM sucursales WHERE "Status" = 'A' AND "TipoSucursal" IN ('S','C') ORDER BY "SucursalId"`
 	}
 	if (id === '11'){
 		sql = `SELECT "ProveedorId","Proveedor","IVA" FROM proveedores WHERE "Status" = 'A' ORDER BY "ProveedorId"`
@@ -465,7 +465,7 @@ app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 		await client.query(sql,values)
 
 		//INSERT inventario_perpetuo
-		sql = `SELECT "SucursalId" FROM sucursales WHERE "TipoSucursal" = 'S'`
+		sql = `SELECT "SucursalId" FROM sucursales WHERE "TipoSucursal" IN ('S','C')`
 		const arregloSucursales = await client.query(sql)
 
 		//arregloSucursales.rows.forEach(async (element)=>{
@@ -2617,6 +2617,304 @@ app.get('/api/ventassucursaleshoy',authenticationToken,async(req,res) => {
 		const data = response.rows
 
 		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/consultaproductospadres/:SucursalId/:DescripcionPadre',authenticationToken,async(req,res) =>{
+	const SucursalId = parseInt(req.params.SucursalId)
+	let DescripcionPadre = req.params.DescripcionPadre
+
+	try{
+		let values = [SucursalId]
+		//Aqui falta poner la validacion del Status en inventario_perpetuo por sucursal
+		let sql = `SELECT DISTINCT vw."CodigoId",vw."CodigoBarras",vw."Descripcion",ip."UnidadesInventario",
+				ip."UnidadesInventario" - ip."UnidadesComprometidas" AS "UnidadesDisponibles",
+				(SELECT COUNT(*) FROM cambios_presentacion cp WHERE cp."CodigoIdPadre" = vw."CodigoId") AS "CantidadHijos"
+				FROM vw_productos_descripcion vw INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = vw."CodigoId"
+				WHERE vw."CodigoId" IN (SELECT "CodigoIdPadre" FROM cambios_presentacion)
+				AND ip."SucursalId" = $1 AND vw."CodigoId" IN (SELECT "CodigoId" FROM productos WHERE "Status" != 'C') 
+		`
+
+		if(DescripcionPadre !== 'null' && DescripcionPadre !== ""){
+			DescripcionPadre = '%'+DescripcionPadre+'%'
+			sql +=`AND vw."Descripcion" LIKE $2`
+			values = [SucursalId,DescripcionPadre]
+		}
+		const response = await pool.query(sql,values)
+		const data = response.rows
+
+
+		let response2;
+		let data2;
+		let arregloPadre = []
+		let arregloHijos = []
+		let json;
+
+
+		//En este ciclo busca los hijos de cada padre
+		for (let i=0; data.length > i;i++){
+			values=[SucursalId,parseInt(data[i].CodigoId)]
+			//Aqui falta poner la validacion del Status en inventario_perpetuo por sucursal
+			sql = `SELECT cp."CodigoIdHijo",vw."CodigoBarras" AS "CodigoBarrasHijo",vw."Descripcion" AS "DescripcionHijo",
+				cp."FactorConversion",ip."UnidadesInventario" AS "UnidadesInventarioHijo"
+				FROM cambios_presentacion cp 
+				INNER JOIN vw_productos_descripcion vw ON vw."CodigoId" = cp."CodigoIdHijo"
+				INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = cp."CodigoIdHijo" AND ip."SucursalId" = $1
+				WHERE cp."CodigoIdPadre" = $2
+				AND cp."CodigoIdHijo" IN (SELECT "CodigoId" FROM productos WHERE "Status" != 'C') 
+			`
+			response2 = await pool.query(sql,values)
+			data2 = response2.rows
+
+			arregloHijos = []
+			for(let ii=0; data2.length > ii; ii++){
+				json ={
+					"CodigoIdHijo": data2[ii].CodigoIdHijo,
+					"CodigoBarrasHijo": data2[ii].CodigoBarrasHijo,
+					"DescripcionHijo": data2[ii].DescripcionHijo,
+					"FactorConversion": data2[ii].FactorConversion,
+					"UnidadesInventarioHijo": data2[ii].UnidadesInventarioHijo,
+				}
+				arregloHijos.push(json)
+			}
+
+			json = {
+				"CodigoIdPadre":data[i].CodigoId,
+				"CodigoBarrasPadre": data[i].CodigoBarras,
+				"DescripcionPadre": data[i].Descripcion,
+				"UnidadesInventarioPadre": data[i].UnidadesInventario,
+				"UnidadesDisponiblesPadre": data[i].UnidadesDisponibles,
+				"CantidadHijos": data[i].CantidadHijos,
+				"detalles": arregloHijos 
+			}
+			arregloPadre.push(json)
+		}
+
+		res.status(200).json(arregloPadre)
+
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.post('/api/cambiosdepresentacionajustes',authenticationToken,async(req,res) => {
+	const { SucursalId,CodigoIdPadre,CodigoBarrasPadre,UnidadesConvertir,FactorConversion,CodigoIdHijo,CodigoBarrasHijo,UnidadesHijoRecibe,ColaboradorId,Usuario } = req.body
+
+	let sql;
+	let values=[]
+	let response;
+	let data;
+	let FolioId=0
+	let CategoriaId = 0
+	let SubcategoriaId = 0
+	let UnidadesInventario = 0
+	let UnidadesInventarioDespues = 0
+	let CostoCompra = 0
+	let CostoPromedio = 0
+	let CostoPromedioPadre = 0
+	let PrecioVentaSinImpuesto = 0
+	let PrecioVentaConImpuesto = 0
+	let Margen = 0
+	let MargenReal = 0
+	let IVAMonto = 0
+	let IEPSMonto = 0
+
+	const TipoAjusteId = 2   //CAMBIO DE PRESENTACION
+	let AfectaCosto = ''
+
+	const client = await pool.connect()
+
+	try{
+		await client.query('BEGIN')
+		values=[SucursalId]
+		sql=`SELECT COALESCE(MAX("FolioId"),0)+1 AS "FolioId" FROM ajustes_inventario WHERE "SucursalId" = $1`
+		response = await client.query(sql,values)
+		FolioId = response.rows[0].FolioId
+		
+		values=[TipoAjusteId]
+		sql=`SELECT "AfectaCosto" FROM tipo_ajustes WHERE "TipoAjusteId" = $1`
+		response = await client.query(sql,values)
+		AfectaCosto = response.rows[0].AfectaCosto
+
+//######################################################################################################################################################
+//ACTUALIZA CAMBIO DE PRESENTACION "PADRE"
+		values=[SucursalId,parseInt(CodigoIdPadre)]
+		sql=`SELECT p."CategoriaId",p."SubcategoriaId",ip."UnidadesInventario",ip."CostoCompra",ip."CostoPromedio",ip."PrecioVentaSinImpuesto",ip."PrecioVentaConImpuesto"
+			FROM productos p INNER JOIN inventario_perpetuo ip ON p."CodigoId" = ip."CodigoId"
+			WHERE ip."SucursalId" = $1
+			AND p."CodigoId" = $2
+			`
+		response = await client.query(sql,values)
+		CategoriaId = response.rows[0].CategoriaId
+		SubcategoriaId = response.rows[0].SubcategoriaId
+		UnidadesInventario = response.rows[0].UnidadesInventario
+		UnidadesInventarioDespues = parseInt(UnidadesInventario) - parseInt(UnidadesConvertir)
+		CostoCompra = parseFloat(response.rows[0].CostoCompra)
+		CostoPromedio = parseFloat(response.rows[0].CostoPromedio)
+		CostoPromedioPadre = parseFloat(response.rows[0].CostoPromedio)
+		PrecioVentaSinImpuesto = parseFloat(response.rows[0].PrecioVentaSinImpuesto)
+		PrecioVentaConImpuesto = parseFloat(response.rows[0].PrecioVentaConImpuesto)
+
+		values = [SucursalId,parseInt(CodigoIdPadre),FolioId,CodigoBarrasPadre,CategoriaId,SubcategoriaId,TipoAjusteId,AfectaCosto,parseInt(UnidadesConvertir),UnidadesInventario,UnidadesInventarioDespues,CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,parseInt(ColaboradorId),Usuario]
+
+		sql = `INSERT INTO ajustes_inventario("SucursalId","CodigoId","FolioId","CodigoBarras","Fecha","CategoriaId","SubcategoriaId","TipoAjusteId",
+			"AfectaCosto","UnidadesAjustadas","UnidadesInventarioAntes","UnidadesInventarioDespues","CostoCompra","CostoPromedio","PrecioVentaSinImpuesto",
+			"PrecioVentaConImpuesto","ColaboradorId","FechaHora","Usuario") 
+			VALUES($1,$2,$3,$4,CLOCK_TIMESTAMP(),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,CLOCK_TIMESTAMP(),$17)
+		`
+		await client.query(sql,values)
+
+		values = [SucursalId,parseInt(CodigoIdPadre),parseInt(UnidadesConvertir),Usuario]
+		sql = `UPDATE inventario_perpetuo
+			SET "UnidadesInventario" = "UnidadesInventario" - $3,
+			"FechaUltimoAjuste" = CLOCK_TIMESTAMP(),
+			"FechaHora" = CLOCK_TIMESTAMP(),
+			"Usuario" = $4
+			WHERE "SucursalId" = $1
+			AND "CodigoId" = $2
+		`
+		await client.query(sql,values)
+
+
+//######################################################################################################################################################
+//ACTUALIZA CAMBIO DE PRESENTACION "HIJO"
+		values=[SucursalId,parseInt(CodigoIdHijo)]
+		sql=`SELECT p."CategoriaId",p."SubcategoriaId",ip."UnidadesInventario",ip."CostoCompra",ip."CostoPromedio",ip."PrecioVentaSinImpuesto",ip."PrecioVentaConImpuesto",
+				ip."Margen",ip."IVA",ip."IEPS"
+			FROM productos p INNER JOIN inventario_perpetuo ip ON p."CodigoId" = ip."CodigoId"
+			WHERE ip."SucursalId" = $1
+			AND p."CodigoId" = $2
+			`
+		response = await client.query(sql,values)
+		CategoriaId = response.rows[0].CategoriaId
+		SubcategoriaId = response.rows[0].SubcategoriaId
+		UnidadesInventario = response.rows[0].UnidadesInventario
+		UnidadesInventarioDespues = parseInt(UnidadesInventario) + parseInt(UnidadesHijoRecibe)
+		CostoCompra = parseFloat(response.rows[0].CostoCompra)
+		CostoPromedio = parseFloat(response.rows[0].CostoPromedio)
+		PrecioVentaSinImpuesto = parseFloat(response.rows[0].PrecioVentaSinImpuesto)
+		PrecioVentaConImpuesto = parseFloat(response.rows[0].PrecioVentaConImpuesto)
+		Margen = parseFloat(response.rows[0].Margen)
+		IVA = parseFloat(response.rows[0].IVA)
+		IEPS = parseFloat(response.rows[0].IEPS)
+
+
+		FolioId = FolioId + 1
+
+
+
+		CostoPromedioPadre = CostoPromedioPadre / parseFloat(FactorConversion) 
+		NuevoCostoPromedio = ((parseInt(UnidadesHijoRecibe)*CostoPromedioPadre) + (UnidadesInventario*CostoPromedio))/(UnidadesHijoRecibe+UnidadesInventario)
+
+		if(PrecioVentaConImpuesto === 0){
+
+			//Revisa si ese producto tiene Precio de Venta Con Impuesto en otra Sucursal para tomarlo de base
+			values = [parseInt(CodigoIdHijo)]
+			sql = `SELECT "PrecioVentaSinImpuesto","PrecioVentaConImpuesto"
+				FROM inventario_perpetuo
+				WHERE "CodigoId" = $1 
+				AND "SucursalId" IN (SELECT "SucursalId" FROM sucursales WHERE "TipoSucursal" = 'S' AND "Status" = 'A')
+				ORDER BY "PrecioVentaConImpuesto" DESC
+				LIMIT 1
+			`
+			response = await client.query(sql,values)
+			let PrecioVentaSinImpuesto2 = parseFloat(response.rows[0].PrecioVentaSinImpuesto)
+			let PrecioVentaConImpuesto2 = parseFloat(response.rows[0].PrecioVentaConImpuesto)
+
+			if(PrecioVentaConImpuesto2 > 0){ //Si otra sucursal tiene precio para ese producto toma como base ese Precio de Venta
+				PrecioVentaSinImpuesto = PrecioVentaSinImpuesto2
+				PrecioVentaConImpuesto = PrecioVentaConImpuesto2
+			}else{
+				PrecioVentaSinImpuesto = NuevoCostoPromedio / (1-(Margen/100))
+				PrecioVentaConImpuesto = PrecioVentaSinImpuesto * (1+((IVA/100)+(IEPS/100)))
+
+
+				PrecioVentaConImpuesto = Math.ceil(PrecioVentaConImpuesto)  //Nuevo Precio de Venta Con Impuesto Redondeado
+				//PrecioVentaSinImpuesto = PrecioVentaConImpuesto / (1+((IVA/100)+(IEPS/100)))
+				//IVAMonto = PrecioVentaSinImpuesto * (IVA/100)
+				//IEPSMonto = PrecioVentaSinImpuesto * (IEPS/100)
+
+				//MargenReal = (PrecioVentaSinImpuestos - NuevoCostoPromedio)/ PrecioVentaSinImpuesto
+			}
+
+		        values = [SucursalId,parseInt(CodigoIdHijo),FolioId,CodigoBarrasHijo,CategoriaId,SubcategoriaId,TipoAjusteId,AfectaCosto,parseInt(UnidadesHijoRecibe),UnidadesInventario,UnidadesInventarioDespues,CostoPromedioPadre,NuevoCostoPromedio,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,parseInt(ColaboradorId),Usuario]
+
+			sql = `INSERT INTO ajustes_inventario("SucursalId","CodigoId","FolioId","CodigoBarras","Fecha","CategoriaId","SubcategoriaId","TipoAjusteId",
+			"AfectaCosto","UnidadesAjustadas","UnidadesInventarioAntes","UnidadesInventarioDespues","CostoCompra","CostoPromedio","PrecioVentaSinImpuesto",
+			"PrecioVentaConImpuesto","ColaboradorId","FechaHora","Usuario") 
+			VALUES($1,$2,$3,$4,CLOCK_TIMESTAMP(),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,CLOCK_TIMESTAMP(),$17)
+			`
+			await client.query(sql,values)
+
+
+			values = [SucursalId,parseInt(CodigoIdHijo),parseInt(UnidadesHijoRecibe),CostoPromedioPadre,NuevoCostoPromedio,Usuario]
+			sql = `UPDATE inventario_perpetuo
+				SET "UnidadesInventario" = "UnidadesInventario" + $3,
+				"CostoCompra" = $4,
+				"CostoPromedio" = $5,
+				"FechaUltimoAjuste" = CLOCK_TIMESTAMP(),
+				"FechaHora" = CLOCK_TIMESTAMP(),
+				"Usuario" = $6
+			WHERE "SucursalId" = $1
+			AND "CodigoId" = $2
+			`
+			await client.query(sql,values)
+
+
+			//Actualiza el Precio de Venta Con Impuesto y el trigger tr_actualiza_precioventa actualiza el resto de los campos relacionados
+
+			values = [parseInt(CodigoIdHijo),PrecioVentaConImpuesto]
+			sql = `UPDATE inventario_perpetuo
+				SET "PrecioVentaConImpuesto" = $2
+				WHERE "CodigoId" = $1
+			`
+
+			await client.query(sql,values)
+			
+		}else{
+
+
+		        values = [SucursalId,parseInt(CodigoIdHijo),FolioId,CodigoBarrasHijo,CategoriaId,SubcategoriaId,TipoAjusteId,AfectaCosto,parseInt(UnidadesHijoRecibe),UnidadesInventario,UnidadesInventarioDespues,CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,parseInt(ColaboradorId),Usuario]
+
+			sql = `INSERT INTO ajustes_inventario("SucursalId","CodigoId","FolioId","CodigoBarras","Fecha","CategoriaId","SubcategoriaId","TipoAjusteId",
+			"AfectaCosto","UnidadesAjustadas","UnidadesInventarioAntes","UnidadesInventarioDespues","CostoCompra","CostoPromedio","PrecioVentaSinImpuesto",
+			"PrecioVentaConImpuesto","ColaboradorId","FechaHora","Usuario") 
+			VALUES($1,$2,$3,$4,CLOCK_TIMESTAMP(),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,CLOCK_TIMESTAMP(),$17)
+			`
+			await client.query(sql,values)
+
+
+
+
+
+			MargenReal = (PrecioVentaSinImpuestos - NuevoCostoPromedio)/ PrecioVentaSinImpuesto
+
+			values = [SucursalId,parseInt(CodigoIdHijo),parseInt(UnidadesHijoRecibe),CostoPromedioPadre,NuevoCostoPromedio,MargenReal,Usuario]
+			sql = `UPDATE inventario_perpetuo
+				SET "UnidadesInventario" = "UnidadesInventario" + $3,
+				"CostoCompra" = $4,
+				"CostoPromedio" = $5,
+				"MargenReal" = $6,
+				"FechaUltimoAjuste" = CLOCK_TIMESTAMP(),
+				"FechaHora" = CLOCK_TIMESTAMP(),
+				"Usuario" = $7
+			WHERE "SucursalId" = $1
+			AND "CodigoId" = $2
+		`
+		await client.query(sql,values)
+
+		}
+
+//######################################################################################################################################################
+
+
+		await client.query('COMMIT')
+		res.status(200).json({"message":"Success!!!"})
+
 	}catch(error){
 		console.log(error.message)
 		res.status(500).json({"error": error.message})
