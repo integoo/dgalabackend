@@ -2888,7 +2888,7 @@ app.post('/api/cambiosdepresentacionajustes',authenticationToken,async(req,res) 
 
 
 
-			MargenReal = (PrecioVentaSinImpuesto - NuevoCostoPromedio)/ PrecioVentaSinImpuesto
+			MargenReal = (PrecioVentaSinImpuesto - NuevoCostoPromedio)/ PrecioVentaSinImpuesto * 100
 
 			values = [SucursalId,parseInt(CodigoIdHijo),parseInt(UnidadesHijoRecibe),CostoPromedioPadre,NuevoCostoPromedio,MargenReal,Usuario]
 			sql = `UPDATE inventario_perpetuo
