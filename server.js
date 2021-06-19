@@ -614,8 +614,11 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 
 			SocioPagoStatus = 'P'
 
-
-			CostoPromedio = ((parseInt(UnidadesRecibidas) * parseFloat(CostoCompra)) + (parseInt(UnidadesInventario)*parseFloat(CostoCompraAnt))) / (parseInt(UnidadesRecibidas) + parseInt(UnidadesInventario))
+			if(UnidadesInventario >=0){
+				CostoPromedio = ((parseInt(UnidadesRecibidas) * parseFloat(CostoCompra)) + (parseInt(UnidadesInventario)*parseFloat(CostoCompraAnt))) / (parseInt(UnidadesRecibidas) + parseInt(UnidadesInventario))
+			}else{
+				CostoPromedio = ((parseInt(UnidadesRecibidas) * parseFloat(CostoCompra)) + (parseInt(0)*parseFloat(CostoCompraAnt))) / (parseInt(UnidadesRecibidas) + parseInt(0))
+			}
 
 			// Si SocioId es igual a uno es que la compra se realizó con dinero de la empresa y el SocioPagoStatus es CERRADO o COBRADO
 			if (SocioId === 1){
@@ -2384,10 +2387,12 @@ app.post('/api/grabatraspasosalida',authenticationToken,async(req,res) => {
 
 			UnidadesInventarioDespuesDestino = UnidadesInventarioAntesDestino + UnidadesRecibidas
 
-			CostoPromedioDestinoDespues = ((UnidadesInventarioAntesDestino * CostoPromedioDestinoAntes) + (UnidadesRecibidas * CostoPromedioOrigen)) / (UnidadesInventarioAntesDestino + UnidadesRecibidas)
+			if(UnidadesInventarioAntesDestino >= 0){
+				CostoPromedioDestinoDespues = ((UnidadesInventarioAntesDestino * CostoPromedioDestinoAntes) + (UnidadesRecibidas * CostoPromedioOrigen)) / (UnidadesInventarioAntesDestino + UnidadesRecibidas)
+			}else{
+				CostoPromedioDestinoDespues = ((0 * CostoPromedioDestinoAntes) + (UnidadesRecibidas * CostoPromedioOrigen)) / (0 + UnidadesRecibidas)
 
-
-
+			}
 
 
 			if(PrecioVentaConImpuestoDestinoAntes === 0){
@@ -2508,6 +2513,8 @@ app.post('/api/grabatraspasosalida',authenticationToken,async(req,res) => {
 		console.log(error.message)
 		await client.query('ROLLBACK')
 		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
 	}
 })
 
@@ -2590,6 +2597,8 @@ app.post('/api/inventariociclico',authenticationToken,async(req,res) => {
 		console.log(error.message)
 		await client.query('ROLLBACK')
 		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
 	}
 })
 
@@ -2808,7 +2817,11 @@ app.post('/api/cambiosdepresentacionajustes',authenticationToken,async(req,res) 
 
 
 		CostoPromedioPadre = CostoPromedioPadre / parseFloat(FactorConversion) 
-		NuevoCostoPromedio = ((parseInt(UnidadesHijoRecibe)*CostoPromedioPadre) + (UnidadesInventario*CostoPromedio))/(UnidadesHijoRecibe+UnidadesInventario)
+		if(UnidadesInventario >= 0){
+			NuevoCostoPromedio = ((parseInt(UnidadesHijoRecibe)*CostoPromedioPadre) + (UnidadesInventario*CostoPromedio))/(UnidadesHijoRecibe+UnidadesInventario)
+		}else{
+			NuevoCostoPromedio = ((parseInt(UnidadesHijoRecibe)*CostoPromedioPadre) + (0*CostoPromedio))/(UnidadesHijoRecibe+0)
+		}
 
 		if(PrecioVentaConImpuesto === 0){
 
@@ -2912,6 +2925,44 @@ app.post('/api/cambiosdepresentacionajustes',authenticationToken,async(req,res) 
 		await client.query('COMMIT')
 		res.status(200).json({"message":"Success!!!"})
 
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
+	}
+})
+
+app.get('/api/consultaproductosinventarioperpetuo/:SucursalId/:CodigoId',authenticationToken,async(req,res) => {
+	const SucursalId = req.params.SucursalId
+	const CodigoId = req.params.CodigoId
+
+	try{
+		const values = [SucursalId,CodigoId]
+		const sql = `SELECT c."Categoria",sc."Subcategoria",p."IVAId" AS "IVAIdProductos",p."IVACompra" AS "IVACompraProductos",p."IEPSId" AS "IEPSIdProductos",
+				p."PadreHijo",p."Hermano",p."Inventariable",
+				p."CompraVenta",p."ComisionVentaPorcentaje",p."Status" AS "StatusProductos",p."FechaHora" AS "FechaHoraProductos",p."Usuario" AS "UsuarioProductos",
+				ip."UnidadesInventario",ip."UnidadesTransito",ip."UnidadesComprometidas",ip."CostoCompra",ip."CostoPromedio",
+				ip."Margen",ip."MargenReal",ip."PrecioVentaSinImpuesto",ip."IVAId" AS "IVAIdInventario",ip."IVA" AS "IVAInventario",
+				ip."IVAMonto" AS "IVAMontoInventario",ip."IEPSId" AS "IEPSIdInventario",ip."IEPS" AS "IEPSInventario",ip."IEPSMonto" AS "IEPSMontoInventario",
+				ip."PrecioVentaConImpuesto",
+				ip."Maximo",ip."Minimo",ip."FechaCambioPrecio",ip."FechaUltimaVenta",ip."FechaUltimaCompra",ip."FechaUltimoTraspasoSalida",
+				ip."FechaUltimoTraspasoEntrada",ip."FechaUltimoAjuste",ip."Status" AS "StatusInventario",ip."FechaHora" AS "FechaHoraInventario",
+				ip."Usuario" AS "UsuarioInventario"
+				FROM productos p
+				INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = p."CodigoId"
+				INNER JOIN categorias c ON c."CategoriaId" = p."CategoriaId"
+				INNER JOIN subcategorias sc ON sc."CategoriaId" = p."CategoriaId" AND sc."SubcategoriaId" = p."SubcategoriaId"
+				WHERE ip."SucursalId" = $1 AND p."CodigoId" = $2
+		`
+		const response = await pool.query(sql,values)
+		let data;
+		if(response.rowCount === 1){
+			data = response.rows
+		}else{
+			data = {"message": "Producto No Existe"}
+		}
+		res.status(200).json(data)
 	}catch(error){
 		console.log(error.message)
 		res.status(500).json({"error": error.message})
