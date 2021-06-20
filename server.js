@@ -2938,30 +2938,52 @@ app.get('/api/consultaproductosinventarioperpetuo/:SucursalId/:CodigoId',authent
 	const CodigoId = req.params.CodigoId
 
 	try{
-		const values = [SucursalId,CodigoId]
-		const sql = `SELECT c."Categoria",sc."Subcategoria",p."IVAId" AS "IVAIdProductos",p."IVACompra" AS "IVACompraProductos",p."IEPSId" AS "IEPSIdProductos",
+		let values = [SucursalId,CodigoId]
+
+		let sql = `SELECT c."Categoria",sc."Subcategoria",
+				iiva."Descripcion" AS "IVADescripcion",
+				p."IVACompra" AS "IVACompraProductos",p."IEPSId" AS "IEPSIdProductos",
 				p."PadreHijo",p."Hermano",p."Inventariable",
-				p."CompraVenta",p."ComisionVentaPorcentaje",p."Status" AS "StatusProductos",p."FechaHora" AS "FechaHoraProductos",p."Usuario" AS "UsuarioProductos",
+				p."CompraVenta",p."ComisionVentaPorcentaje",p."Status" AS "StatusProductos",
+				to_char(p."FechaHora", 'yyyy-MM-dd HH24:MI:ss.ms.us') AS "FechaHoraProductos",
+				p."Usuario" AS "UsuarioProductos",
 				ip."UnidadesInventario",ip."UnidadesTransito",ip."UnidadesComprometidas",ip."CostoCompra",ip."CostoPromedio",
-				ip."Margen",ip."MargenReal",ip."PrecioVentaSinImpuesto",ip."IVAId" AS "IVAIdInventario",ip."IVA" AS "IVAInventario",
+				ip."Margen",CAST(ip."MargenReal" AS DEC(5,2)),ip."PrecioVentaSinImpuesto",ip."IVAId" AS "IVAIdInventario",ip."IVA" AS "IVAInventario",
 				ip."IVAMonto" AS "IVAMontoInventario",ip."IEPSId" AS "IEPSIdInventario",ip."IEPS" AS "IEPSInventario",ip."IEPSMonto" AS "IEPSMontoInventario",
 				ip."PrecioVentaConImpuesto",
 				ip."Maximo",ip."Minimo",ip."FechaCambioPrecio",ip."FechaUltimaVenta",ip."FechaUltimaCompra",ip."FechaUltimoTraspasoSalida",
-				ip."FechaUltimoTraspasoEntrada",ip."FechaUltimoAjuste",ip."Status" AS "StatusInventario",ip."FechaHora" AS "FechaHoraInventario",
+				ip."FechaUltimoTraspasoEntrada",ip."FechaUltimoAjuste",ip."Status" AS "StatusInventario",
+				to_char(ip."FechaHora", 'yyyy-MM-dd HH24:MI:ss.ms.us') AS "FechaHoraInventario",
 				ip."Usuario" AS "UsuarioInventario"
 				FROM productos p
 				INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = p."CodigoId"
 				INNER JOIN categorias c ON c."CategoriaId" = p."CategoriaId"
 				INNER JOIN subcategorias sc ON sc."CategoriaId" = p."CategoriaId" AND sc."SubcategoriaId" = p."SubcategoriaId"
+				INNER JOIN impuestos_iva iiva ON iiva."IVAId" = p."IVAId"
 				WHERE ip."SucursalId" = $1 AND p."CodigoId" = $2
 		`
-		const response = await pool.query(sql,values)
+		let response = await pool.query(sql,values)
 		let data;
+
 		if(response.rowCount === 1){
 			data = response.rows
 		}else{
 			data = {"message": "Producto No Existe"}
 		}
+
+		values = [CodigoId]
+		sql =`SELECT s."Sucursal",ip."UnidadesInventario" - ip."UnidadesComprometidas" AS "UnidadesDisponibles"
+				FROM sucursales s
+				INNER JOIN inventario_perpetuo ip ON ip."SucursalId" = s."SucursalId"
+				WHERE ip."CodigoId" = $1
+			ORDER BY s."SucursalId"
+			`
+		response = await pool.query(sql,values)
+
+		let data2 = response.rows
+
+		data.push(data2)
+
 		res.status(200).json(data)
 	}catch(error){
 		console.log(error.message)
