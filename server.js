@@ -31,7 +31,7 @@ app.options('*',cors())
 
 //routes
 app.get('/HelloWorld', (req,res)=>{
-	res.send('Hello World AWS Testing Server')
+	res.send('Hello World AWS Testing Server!!!')
 })
 
 
