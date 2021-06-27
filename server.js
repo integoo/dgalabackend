@@ -118,6 +118,20 @@ app.get('/api/sucursales/:naturalezaCC',authenticationToken,async(req, res) => {
 	}
 })
 
+app.get('/api/fechaactual',authenticationToken,async(req,res) =>{
+	try{
+		const sql = `SELECT "Fecha","PrimerDiaMes","UltimoDiaMes"
+			FROM dim_catalogo_tiempo
+			WHERE "Fecha" = CURRENT_DATE 
+			`
+		const response = await pool.query(sql)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
 
 app.get('/ingresos/unidadesdenegociocatalogo/:naturalezaCC',authenticationToken,async(req, res) => {
 	let naturalezaCC = req.params.naturalezaCC;
@@ -322,12 +336,9 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 })
 
 
-app.get('/ingresos/getIngresos/:fecha/:sucursal',authenticationToken,async(req, res)=> {
+app.get('/ingresos/getIngresosEgresos/:fecha/:naturalezaCC',authenticationToken,async(req, res)=> {
 	const vfecha = req.params.fecha
-	const vsucursal = req.params.sucursal
-	const vunidaddenegocio = req.params.unidaddenegocio
-	const vcuentacontable = req.params.cuentacontable
-	const vsubcuentacontable = req.params.subcuentacontable
+	const naturalezaCC = req.params.naturalezaCC
 
 
 	let sql = `SELECT rc."SucursalId",rc."FolioId",s."SucursalNombre",udn."UnidadDeNegocioId",udn."UnidadDeNegocioNombre",cc."CuentaContableId",
@@ -338,14 +349,17 @@ app.get('/ingresos/getIngresos/:fecha/:sucursal',authenticationToken,async(req, 
 		INNER JOIN unidades_de_negocio udn ON rc."UnidadDeNegocioId"=udn."UnidadDeNegocioId"
 		INNER JOIN cuentas_contables cc ON rc."CuentaContableId" = cc."CuentaContableId"
 		INNER JOIN subcuentas_contables scc ON rc."CuentaContableId"= scc."CuentaContableId" AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
-		WHERE rc."Fecha" = $1 AND rc."SucursalId" = $2 
+		INNER JOIN dim_catalogo_tiempo dct ON dct."Fecha" = rc."Fecha"
+		WHERE dct."PrimerDiaMes"<= $1 AND dct."UltimoDiaMes">= $1
 		`
-		//WHERE rc."Fecha" = $1 AND rc."SucursalId" = $2 AND rc."UnidadDeNegocioId" = $3 AND rc."CuentaContableId" = $4 AND rc."SubcuentaContableId" = $5
+	if(naturalezaCC > 0){
+		sql+=`AND rc."Monto">=0 `
+	}else{
+		sql+=`AND rc."Monto"<0 `
+	}
 	
 	let response;
-	//const values=[vsucursal,vfecha]
-	//const values=[vfecha,vsucursal,vunidaddenegocio,vcuentacontable,vsubcuentacontable]
-	const values=[vfecha,vsucursal]
+	const values=[vfecha]
 	try{
 		response = await pool.query(sql,values)
 		const data = response.rows
@@ -425,6 +439,32 @@ app.get('/api/catalogos/:id',authenticationToken,async (req,res) => {
 	}
 })
 
+app.get('/api/validamovimientoingresosegresos/:SucursalId/:UnidadDeNegocioId/:CuentaContableId/:SubcuentaContableId/:Fecha',authenticationToken,async(req,res) => {
+	const SucursalId = parseInt(req.params.SucursalId)
+	const UnidadDeNegocioId = parseInt(req.params.UnidadDeNegocioId)
+	const CuentaContableId = parseInt(req.params.CuentaContableId)
+	const SubcuentaContableId = req.params.SubcuentaContableId
+	const Fecha = req.params.Fecha
+
+	const values = [SucursalId,UnidadDeNegocioId,CuentaContableId,SubcuentaContableId,Fecha]
+	const sql = `SELECT COUNT(*) AS "cuantos"
+			FROM registro_contable
+			WHERE "SucursalId" = $1
+			AND "UnidadDeNegocioId" = $2
+			AND "CuentaContableId" = $3
+			AND "SubcuentaContableId" = $4
+			AND "Fecha" = $5
+	`
+	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
 
 app.post('/api/altaProductos',authenticationToken,async(req,res)=>{
 	const { CodigoBarras, Descripcion, CategoriaId, SubcategoriaId, UnidadesCapacidad, MedidaCapacidadId, UnidadesVenta, MedidaVentaId, MarcaId, ColorId,
