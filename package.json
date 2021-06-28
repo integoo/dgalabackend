@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "prdStart": "nodemon server.js",
+    "prdStart": "node server.js",
     "devStart": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
