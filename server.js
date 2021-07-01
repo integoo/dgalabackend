@@ -937,6 +937,7 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 				PrecioVentaSinImpuesto = parseFloat(detalles[i].PrecioVentaConImpuesto) /(1+((parseFloat(IVA) + parseFloat(IEPS))/100))
 			}else{
 				PrecioVentaSinImpuesto = response.rows[0].PrecioVentaSinImpuesto
+				ComisionVenta = 0
 			}
 
 			IVAMonto = parseFloat(PrecioVentaSinImpuesto) * parseFloat(IVA/100) 
@@ -946,7 +947,7 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 			UnidadesDevueltas = 0
 			FechaDevolucionVenta = null
 
-			if(ComisionVentaPorcentaje !== 0){
+			if(parseFloat(ComisionVentaPorcentaje) !== 0){
 				ComisionVenta = PrecioVentaSinImpuesto * (ComisionVentaPorcentaje/100) 
 			}
 
