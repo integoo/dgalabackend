@@ -2691,10 +2691,14 @@ app.get('/api/ventassucursalesperiodo/:FechaInicial/:FechaFinal/:DiasMes',authen
 		CAST(((COALESCE(SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto"),0)/$3*$4) -
 		COALESCE(cm."Cuota",0)) AS DEC(12,2))  AS "DiferenciaDinero",
 	
-		CASE WHEN COALESCE(cm."Cuota",0) <> 0 THEN
-			CAST(((COALESCE(SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto"),0)/$3*$4) /
-			COALESCE(cm."Cuota",0))/100 AS DEC(5,2)) 
-		ELSE 100 END
+		
+		CASE WHEN COALESCE(cm."Cuota",0) = 0
+		THEN 
+			100
+		ELSE
+			CAST( (COALESCE(SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto"),0)/$3*$4 / 
+			CASE WHEN COALESCE(cm."Cuota",0) = 0 THEN 1 ELSE COALESCE(cm."Cuota",0) END)*100 AS DEC(5,2))
+		END
 		AS "DiferenciaPorcentaje"
 
 		FROM sucursales s
