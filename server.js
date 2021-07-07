@@ -301,10 +301,18 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 	let values = []
 	const client = await pool.connect();
 	let sql = ''
+	let response;
+	let Periodo;
 
 	try{
 		await client.query('BEGIN')
-		values = [vsucursalid,vunidaddenegocioid,vcuentacontableid,vsubcuentacontableid,vcomentarios,vfecha,'202001',vmonto,'P',"now()",vusuario,'now()']
+		values = [vfecha]
+		sql = `SELECT "Periodo" FROM dim_catalogo_tiempo WHERE "Fecha" = $1`
+		response = await client.query(sql,values)
+		Periodo = response.rows[0].Periodo
+
+		
+		values = [vsucursalid,vunidaddenegocioid,vcuentacontableid,vsubcuentacontableid,vcomentarios,vfecha,Periodo,vmonto,'P',"now()",vusuario,'now()']
 		sql = `INSERT INTO registro_contable VALUES (
 		(SELECT COALESCE(MAX("FolioId"),0)+1 FROM registro_contable WHERE "SucursalId" = $1),
 		$1,
@@ -357,6 +365,7 @@ app.get('/ingresos/getIngresosEgresos/:fecha/:naturalezaCC',authenticationToken,
 	}else{
 		sql+=`AND rc."Monto"<0 `
 	}
+		sql+=`ORDER BY rc."Fecha",rc."SucursalId",udn."UnidadDeNegocioId",cc."CuentaContableId",scc."SubcuentaContableId"`
 	
 	let response;
 	const values=[vfecha]
@@ -1711,6 +1720,7 @@ app.get('/api/fechahoy',authenticationToken,async(req,res) => {
 	}
 })
 
+
 app.get('/api/consultaretiros/:Periodo',authenticationToken,async(req,res) => {
 	const Periodo = req.params.Periodo
 
@@ -2646,17 +2656,6 @@ app.post('/api/inventariociclico',authenticationToken,async(req,res) => {
 
 app.get('/api/ventassucursaleshoy',authenticationToken,async(req,res) => {
 	try{
-		/*
-		const sql = `SELECT s."Sucursal",SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto") AS "ExtVentaConImp"
-			FROM ventas v INNER JOIN sucursales s ON v."SucursalId" = s."SucursalId"
-			WHERE v."Status" = 'V'
-			AND v."Fecha" = CURRENT_DATE
-			GROUP BY s."Sucursal"
-			ORDER BY s."Sucursal"
-		`
-		*/
-
-
 		const sql = `SELECT s."Sucursal",SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto") AS "ExtVentaConImp"
 			FROM vw_ventas_devoventas v INNER JOIN sucursales s ON v."SucursalId" = s."SucursalId"
 			WHERE v."Fecha" = CURRENT_DATE
@@ -2666,6 +2665,66 @@ app.get('/api/ventassucursaleshoy',authenticationToken,async(req,res) => {
 		const response = await pool.query(sql)
 		const data = response.rows
 
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/ventassucursalesperiodo/:FechaInicial/:FechaFinal/:DiasMes',authenticationToken,async(req,res)=>{
+	const FechaInicial = req.params.FechaInicial 
+	const FechaFinal = req.params.FechaFinal
+	const DiasMes = parseInt(req.params.DiasMes)
+
+	//Días que se toman de base del periodo
+	const d = new Date(FechaFinal)
+	const dias = parseInt(d.getDate())
+
+	const values = [FechaInicial,FechaFinal,dias,DiasMes]
+	
+	const sql = `SELECT s."Sucursal",
+		COALESCE(SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto"),0) AS "Venta",
+		CAST(COALESCE(SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto"),0)/$3*$4 AS DEC(12,2)) AS "VentaProyectada",
+		COALESCE(cm."Cuota",0) AS "Cuota",
+	
+		CAST(((COALESCE(SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto"),0)/$3*$4) -
+		COALESCE(cm."Cuota",0)) AS DEC(12,2))  AS "DiferenciaDinero",
+	
+		CASE WHEN COALESCE(cm."Cuota",0) <> 0 THEN
+			CAST(((COALESCE(SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto"),0)/$3*$4) /
+			COALESCE(cm."Cuota",0))/100 AS DEC(5,2)) 
+		ELSE 100 END
+		AS "DiferenciaPorcentaje"
+
+		FROM sucursales s
+		LEFT JOIN ventas v ON v."SucursalId" = s."SucursalId" AND v."Status" = 'V' AND v."Fecha" BETWEEN $1 AND $2
+		LEFT JOIN cuotas_mes cm ON cm."SucursalId" = s."SucursalId" AND cm."PrimerDiaMes" BETWEEN $1 AND $2
+		WHERE s."TipoSucursal" = 'S' AND s."Status" = 'A'
+		GROUP BY s."Sucursal",COALESCE(cm."Cuota",0)
+		ORDER BY s."Sucursal"
+		`
+	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/consultaperiodos',authenticationToken,async(req,res) =>{
+	let sql = `SELECT DISTINCT "Periodo","PrimerDiaMes","UltimoDiaMes",CURRENT_DATE AS "Hoy",
+				CURRENT_DATE -1 AS "Ayer" 
+				FROM dim_catalogo_tiempo
+				WHERE ("Fecha" IN (SELECT DISTINCT "Fecha" FROM ventas WHERE "Status" = 'V') OR
+				"Fecha" = CURRENT_DATE)
+				ORDER BY "Periodo" DESC
+				`
+	try{
+		const response = await pool.query(sql)
+		const data = response.rows 
 		res.status(200).json(data)
 	}catch(error){
 		console.log(error.message)
