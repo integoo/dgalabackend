@@ -301,7 +301,7 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 	let values = []
 	const client = await pool.connect();
 	let sql = ''
-	let response;
+	let response='';
 	let Periodo;
 
 	try{
@@ -313,7 +313,9 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 
 		
 		values = [vsucursalid,vunidaddenegocioid,vcuentacontableid,vsubcuentacontableid,vcomentarios,vfecha,Periodo,vmonto,'P',"now()",vusuario,'now()']
-		sql = `INSERT INTO registro_contable VALUES (
+		sql = `INSERT INTO registro_contable ("FolioId","SucursalId","UnidadDeNegocioId","CuentaContableId",
+				"SubcuentaContableId","Comentarios","Fecha","Periodo","Monto","Moneda",
+				"FechaHoraAlta","Usuario","FechaHora") VALUES (
 		(SELECT COALESCE(MAX("FolioId"),0)+1 FROM registro_contable WHERE "SucursalId" = $1),
 		$1,
 		$2,
@@ -329,10 +331,67 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 		$12)
 		RETURNING "FolioId","SucursalId"
 		`
-		let response = await client.query(sql,values)
-		//console.log(response.rows[0].SucursalId)
+		response = await client.query(sql,values)
 		await client.query('COMMIT')
-		res.status(200).send("Success!!! FOLIO="+response.rows[0].FolioId)
+		res.status(200).json({"message": "Success!!! FOLIO="+response.rows[0].FolioId})
+	}catch(error){
+		console.log(error.message)
+		await client.query('ROLLBACK')
+		// res.status(400).send(error.message)
+		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
+	}
+	
+})
+
+app.post('/ingresos/grabaingresos2',authenticationToken, async(req, res) => {
+	const arreglo = req.body
+	let values = []
+	const client = await pool.connect();
+	let sql = ''
+	let response;
+	let Periodo;
+	try{
+		await client.query('BEGIN')
+		values = [arreglo[0].Fecha]
+		sql = `SELECT "Periodo" FROM dim_catalogo_tiempo WHERE "Fecha" = $1`
+		response = await client.query(sql,values)
+		Periodo = response.rows[0].Periodo
+		for (let i =0; i< arreglo.length; i++){
+			const vsucursalid = parseInt(arreglo[i].SucursalId)
+			const vunidaddenegocioid = parseInt(arreglo[i].UnidadDeNegocioId)
+			const vcuentacontableid = parseInt(arreglo[i].CuentaContableId)
+			const vsubcuentacontableid = arreglo[i].SubcuentaContableId
+			const vfecha = arreglo[i].Fecha
+			const vmonto = parseFloat(arreglo[i].Monto)
+			const vcomentarios = arreglo[i].Comentarios
+			const vusuario = arreglo[i].Usuario
+
+			values = [vsucursalid,vunidaddenegocioid,vcuentacontableid,vsubcuentacontableid,vcomentarios,vfecha,Periodo,vmonto,'P',"now()",vusuario,'now()']
+			sql = `INSERT INTO registro_contable ("FolioId","SucursalId","UnidadDeNegocioId","CuentaContableId",
+			"SubcuentaContableId","Comentarios","Fecha","Periodo","Monto","Moneda",
+			"FechaHoraAlta","Usuario","FechaHora") VALUES (
+			(SELECT COALESCE(MAX("FolioId"),0)+1 FROM registro_contable WHERE "SucursalId" = $1),
+			$1,
+			$2,
+			$3,
+			$4,
+			$5,
+			$6,
+			$7,
+			$8,
+			$9,
+			$10,
+			$11,
+			$12)
+			RETURNING "FolioId","SucursalId"
+			`
+			let response = await client.query(sql,values)
+			//console.log(response.rows[0].SucursalId,response.rows[0].FolioId)
+		}
+		await client.query('COMMIT')
+		res.status(200).json({"message": "Success!!!"})
 	}catch(error){
 		console.log(error.message)
 		await client.query('ROLLBACK')
@@ -340,35 +399,41 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 	}finally{
 		client.release()
 	}
-
 })
 
 
-app.get('/ingresos/getIngresosEgresos/:fecha/:naturalezaCC',authenticationToken,async(req, res)=> {
+
+app.get('/ingresos/getIngresosEgresos/:fecha/:naturalezaCC/:accesoDB',authenticationToken,async(req, res)=> {
 	const vfecha = req.params.fecha
 	const naturalezaCC = req.params.naturalezaCC
+	const accesoDB = req.params.accesoDB
+	
+	const values=[vfecha]
 
-
-	let sql = `SELECT rc."SucursalId",rc."FolioId",s."SucursalNombre",udn."UnidadDeNegocioId",udn."UnidadDeNegocioNombre",cc."CuentaContableId",
+	let sql = `SELECT rc."Id",rc."SucursalId",rc."FolioId",s."SucursalNombre",udn."UnidadDeNegocioId",udn."UnidadDeNegocioNombre",cc."CuentaContableId",
 		cc."CuentaContable",scc."SubcuentaContableId",
-		scc."SubcuentaContable",rc."Fecha",rc."Monto"
+		scc."SubcuentaContable",CAST(rc."Fecha" AS CHAR(10)),rc."Monto", rc."Comentarios"
 		FROM registro_contable rc
 		INNER JOIN sucursales s ON rc."SucursalId"=s."SucursalId"
 		INNER JOIN unidades_de_negocio udn ON rc."UnidadDeNegocioId"=udn."UnidadDeNegocioId"
 		INNER JOIN cuentas_contables cc ON rc."CuentaContableId" = cc."CuentaContableId"
 		INNER JOIN subcuentas_contables scc ON rc."CuentaContableId"= scc."CuentaContableId" AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
 		INNER JOIN dim_catalogo_tiempo dct ON dct."Fecha" = rc."Fecha"
-		WHERE dct."PrimerDiaMes"<= $1 AND dct."UltimoDiaMes">= $1
 		`
-	if(naturalezaCC > 0){
-		sql+=`AND rc."Monto">=0 `
+	if (accesoDB === 'mes'){
+		sql+=`WHERE dct."PrimerDiaMes"<= $1 AND dct."UltimoDiaMes">= $1 `
 	}else{
-		sql+=`AND rc."Monto"<0 `
+		sql+=`WHERE rc."Fecha" = $1`
 	}
-		sql+=`ORDER BY rc."Fecha",rc."SucursalId",udn."UnidadDeNegocioId",cc."CuentaContableId",scc."SubcuentaContableId"`
+
+	if(naturalezaCC > 0){
+		sql+=`AND rc."Monto" >= 0 `
+	}else{
+		sql+=`AND rc."Monto" < 0 `
+	}
+		sql+=`ORDER BY rc."Fecha" DESC,rc."SucursalId",rc."FolioId" DESC,udn."UnidadDeNegocioId",cc."CuentaContableId",scc."SubcuentaContableId"`
 	
 	let response;
-	const values=[vfecha]
 	try{
 		response = await pool.query(sql,values)
 		const data = response.rows
@@ -380,9 +445,54 @@ app.get('/ingresos/getIngresosEgresos/:fecha/:naturalezaCC',authenticationToken,
 	}
 })
 
+app.put('/api/actualizaingresosegresos',authenticationToken,async(req, res) =>{
+	const SucursalId = parseInt(req.body.SucursalId)
+	const FolioId = parseInt(req.body.FolioId)
+	const Monto = parseFloat(req.body.Monto) 
+	const Comentarios = req.body.Comentarios 
+	const Usuario = req.body.Usuario
+
+	let response;
+	let values=[];
+	let sql="";
+
+	const client = await pool.connect()
+	try{
+		await client.query('BEGIN')
+
+		values = [SucursalId,FolioId,Monto,Comentarios,Usuario]
+		sql = `UPDATE registro_contable
+				SET "Monto" = $3,
+				"Comentarios" = $4,
+				"Usuario" = $5,
+				"FechaHora" = CLOCK_TIMESTAMP()
+				WHERE "SucursalId" = $1
+				AND "FolioId" = $2
+				AND "Fecha" IN (
+					SELECT dct."Fecha" FROM dim_catalogo_tiempo dct INNER JOIN cierres_mes cm ON dct."Fecha" >= cm."PrimerDiaMes" AND cm."Status" = 'A'
+				)
+				`
+		response = await client.query(sql,values)
+		if(response.rowCount === 0){
+			res.status(201).json({"message": "NO SE ACTUALIZÓ EL REGISTRO!!!"})
+		}else{
+			res.status(201).json({"message": "Success!!!"})
+		}
+		await client.query('COMMIT')
+	}catch(error){
+		console.log(error.message)
+		client.query('ROLLBACK')
+		res.status(500).json({"error": error.message})
+	}finally{
+		client.release()
+	}
+})
+
 app.get('/periodoabierto',authenticationToken,async (req, res) => {
-	let sql = `SELECT "Periodo","PrimerDiaMes" FROM cierres_mes
-			WHERE "Status" = 'A'
+	let sql = `SELECT cm."Periodo",cm."PrimerDiaMes",CAST(ct."UltimoDiaMes" AS CHAR(10)) 
+			FROM cierres_mes cm
+			INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = cm."PrimerDiaMes"
+			WHERE cm."Status" = 'A'
 	`
 	let response;
 	const values=[]
