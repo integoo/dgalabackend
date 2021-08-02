@@ -431,7 +431,8 @@ app.get('/ingresos/getIngresosEgresos/:fecha/:naturalezaCC/:accesoDB',authentica
 	}else{
 		sql+=`AND rc."Monto" < 0 `
 	}
-		sql+=`ORDER BY rc."Fecha" DESC,rc."SucursalId",rc."FolioId" DESC,udn."UnidadDeNegocioId",cc."CuentaContableId",scc."SubcuentaContableId"`
+		//sql+=`ORDER BY rc."Fecha" DESC,rc."SucursalId",rc."FolioId" DESC,udn."UnidadDeNegocioId",cc."CuentaContableId",scc."SubcuentaContableId"`
+		sql+=`ORDER BY rc."SucursalId",rc."FolioId" DESC,udn."UnidadDeNegocioId",cc."CuentaContableId",scc."SubcuentaContableId"`
 	
 	let response;
 	try{
