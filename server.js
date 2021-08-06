@@ -403,10 +403,11 @@ app.post('/ingresos/grabaingresos2',authenticationToken, async(req, res) => {
 
 
 
-app.get('/ingresos/getIngresosEgresos/:fecha/:naturalezaCC/:accesoDB',authenticationToken,async(req, res)=> {
+app.get('/ingresos/getIngresosEgresos/:fecha/:naturalezaCC/:accesoDB/:trans',authenticationToken,async(req, res)=> {
 	const vfecha = req.params.fecha
 	const naturalezaCC = req.params.naturalezaCC
 	const accesoDB = req.params.accesoDB
+	const trans = req.params.trans
 	
 	const values=[vfecha]
 
@@ -429,10 +430,13 @@ app.get('/ingresos/getIngresosEgresos/:fecha/:naturalezaCC/:accesoDB',authentica
 	if(naturalezaCC > 0){
 		sql+=`AND rc."Monto" >= 0 `
 	}else{
-		sql+=`AND rc."Monto" < 0 `
+		sql+=`AND rc."Monto" <= 0 `
 	}
-		//sql+=`ORDER BY rc."Fecha" DESC,rc."SucursalId",rc."FolioId" DESC,udn."UnidadDeNegocioId",cc."CuentaContableId",scc."SubcuentaContableId"`
-		sql+=`ORDER BY rc."SucursalId",rc."FolioId" DESC,udn."UnidadDeNegocioId",cc."CuentaContableId",scc."SubcuentaContableId"`
+	if (trans === "Ingresos"){
+		sql+=`ORDER BY rc."Fecha" DESC,rc."SucursalId",rc."FolioId" DESC,udn."UnidadDeNegocioId",cc."CuentaContableId",scc."SubcuentaContableId"`
+	}else{
+		sql+=`ORDER BY rc."Id" DESC,rc."SucursalId",rc."FolioId" DESC,udn."UnidadDeNegocioId",cc."CuentaContableId",scc."SubcuentaContableId"`
+	}
 	
 	let response;
 	try{
