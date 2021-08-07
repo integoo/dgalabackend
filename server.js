@@ -428,9 +428,9 @@ app.get('/ingresos/getIngresosEgresos/:fecha/:naturalezaCC/:accesoDB/:trans',aut
 	}
 
 	if(naturalezaCC > 0){
-		sql+=`AND rc."Monto" >= 0 `
+		sql+=`AND rc."Monto" >= 0 AND cc."NaturalezaCC" = 1`
 	}else{
-		sql+=`AND rc."Monto" <= 0 `
+		sql+=`AND rc."Monto" <= 0 AND cc."NaturalezaCC" = -1`
 	}
 	if (trans === "Ingresos"){
 		sql+=`ORDER BY rc."Fecha" DESC,rc."SucursalId",rc."FolioId" DESC,udn."UnidadDeNegocioId",cc."CuentaContableId",scc."SubcuentaContableId"`
