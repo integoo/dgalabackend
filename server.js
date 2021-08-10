@@ -2787,7 +2787,7 @@ app.get('/api/ventassucursaleshoy',authenticationToken,async(req,res) => {
 	}
 })
 
-app.get('/api/ventassucursalesperiodo/:FechaInicial/:FechaFinal/:DiasMes',authenticationToken,async(req,res)=>{
+app.get('/api/ventassucursalesperiodolavamatica/:FechaInicial/:FechaFinal/:DiasMes',authenticationToken,async(req,res)=>{
 	const FechaInicial = req.params.FechaInicial 
 	const FechaFinal = req.params.FechaFinal
 	const DiasMes = parseInt(req.params.DiasMes)
@@ -2818,12 +2818,60 @@ app.get('/api/ventassucursalesperiodo/:FechaInicial/:FechaFinal/:DiasMes',authen
 
 		FROM sucursales s
 		LEFT JOIN ventas v ON v."SucursalId" = s."SucursalId" AND v."Status" = 'V' AND v."Fecha" BETWEEN $1 AND $2
-		LEFT JOIN cuotas_mes cm ON cm."SucursalId" = s."SucursalId" AND cm."PrimerDiaMes" BETWEEN $1 AND $2
+		LEFT JOIN cuotas_mes cm ON cm."SucursalId" = s."SucursalId" AND cm."PrimerDiaMes" BETWEEN $1 AND $2 AND cm."UnidadDeNegocioId" IN (3,5)
 		WHERE s."TipoSucursal" = 'S' AND s."Status" = 'A'
 		GROUP BY s."Sucursal",COALESCE(cm."Cuota",0)
 		ORDER BY s."Sucursal"
 		`
 	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/ventassucursalesperiodounidaddenegocio/:FechaInicial/:FechaFinal/:DiasMes/:UnidadDeNegocioId',authenticationToken,async(req,res) =>{
+	const FechaInicial = req.params.FechaInicial 
+	const FechaFinal = req.params.FechaFinal 
+	const DiasMes = req.params.DiasMes
+	const UnidadDeNegocioId = req.params.UnidadDeNegocioId
+
+	//Días que se toman de base del periodo
+	const d = new Date(FechaFinal)
+	const dias = parseInt(d.getDate())
+
+	try{
+		const values = [FechaInicial,FechaFinal,dias,DiasMes,UnidadDeNegocioId]
+
+		const sql = `SELECT s."Sucursal",
+			COALESCE(SUM("Monto"),0) AS "Venta",
+			CAST(COALESCE(SUM("Monto"),0)/$3*$4 AS DEC(12,2)) AS "VentaProyectada",
+			COALESCE(cm."Cuota",0) AS "Cuota",
+
+			CAST(((COALESCE(SUM("Monto"),0)/$3*$4) -
+			COALESCE(cm."Cuota",0)) AS DEC(12,2))  AS "DiferenciaDinero",
+
+			CASE WHEN COALESCE(cm."Cuota",0) = 0
+			THEN 
+				100
+			ELSE
+				CAST( (COALESCE(SUM("Monto"),0)/$3*$4 / 
+				CASE WHEN COALESCE(cm."Cuota",0) = 0 THEN 1 ELSE COALESCE(cm."Cuota",0) END)*100 AS DEC(5,2))
+			END
+			AS "DiferenciaPorcentaje",
+			MAX(rc."Fecha") AS "FechaMaxima"
+
+
+			FROM registro_contable rc 
+			INNER JOIN sucursales s ON s."SucursalId" = rc."SucursalId"
+			LEFT JOIN cuotas_mes cm ON cm."SucursalId" = s."SucursalId" AND cm."PrimerDiaMes" BETWEEN $1 AND $2 AND cm."UnidadDeNegocioId" IN ($5)
+			WHERE rc."Fecha" BETWEEN $1 AND $2 AND rc."UnidadDeNegocioId" = $5 AND rc."CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = 1) 
+			GROUP BY s."Sucursal", cm."Cuota"
+			ORDER BY s."Sucursal"
+		`
 		const response = await pool.query(sql,values)
 		const data = response.rows
 		res.status(200).json(data)
