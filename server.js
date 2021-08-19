@@ -2899,6 +2899,25 @@ app.get('/api/consultaperiodos',authenticationToken,async(req,res) =>{
 	}
 })
 
+app.get('/api/consultaperiodosregistrocontable',authenticationToken,async(req,res) =>{
+	let sql = `SELECT DISTINCT "Periodo","PrimerDiaMes","UltimoDiaMes",CURRENT_DATE AS "Hoy",
+				CURRENT_DATE -1 AS "Ayer" 
+				FROM dim_catalogo_tiempo
+				WHERE ("Fecha" IN (SELECT DISTINCT "Fecha" FROM registro_contable) OR
+				"Fecha" = CURRENT_DATE)
+				ORDER BY "Periodo" DESC
+				`
+	try{
+		const response = await pool.query(sql)
+		const data = response.rows 
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+
 app.get('/api/consultaproductospadres/:SucursalId/:DescripcionPadre',authenticationToken,async(req,res) =>{
 	const SucursalId = parseInt(req.params.SucursalId)
 	let DescripcionPadre = req.params.DescripcionPadre
@@ -3256,6 +3275,334 @@ app.get('/api/consultaproductosinventarioperpetuo/:SucursalId/:CodigoId',authent
 		console.log(error.message)
 		res.status(500).json({"error": error.message})
 	}
+})
+
+app.get('/api/estadoderesultadoslimpiaduria/:Periodo',authenticationToken,async(req,res) =>{
+	const Periodo = req.params.Periodo 
+
+	let values=[Periodo]
+	let sql = `SELECT  DISTINCT "PrimerDiaMes","UltimoDiaMes"
+				FROM dim_catalogo_tiempo
+				WHERE "Periodo" = $1 
+	`
+	let response = await pool.query(sql,values)
+	let data = response.rows 
+	const PrimerDiaMes = data[0].PrimerDiaMes 
+	const UltimoDiaMes = data[0].UltimoDiaMes
+
+
+	try{
+		values = [PrimerDiaMes,UltimoDiaMes]
+		sql = `
+		SELECT
+		'Ventas' AS "Concepto",
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 1
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 1
+		AND "CuentaContableId" = 1000
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc02"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 2
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 1
+		AND "CuentaContableId" = 1000
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc03"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 3
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 1
+		AND "CuentaContableId" = 1000
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc04"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 4
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 1
+		AND "CuentaContableId" = 1000
+		),
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT
+		'Gastos Planta Matriz' AS "Concepto",
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 100
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 10
+		AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)
+		),
+		0 AS "Suc02",
+		0 AS "Suc03",
+		0 AS "Suc04",
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT 
+		'** UTILIDAD BRUTA' AS "Concepto",
+		0 AS "Suc01",
+		0 AS "Suc02",
+		0 AS "Suc03",
+		0 AS "Suc04",
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT
+		'Gastos Sucursal' AS "Concepto",
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 1
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 1
+		AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc02"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 2
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 1
+		AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc03"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 3
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 1
+		AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc04"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 4
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 1
+		AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)
+		),
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT 
+		'** UTILIDAD DE OPERACION' AS "Concepto",
+		0 AS "Suc01",
+		0 AS "Suc02",
+		0 AS "Suc03",
+		0 AS "Suc04",
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT
+		'Melate' AS "Concepto",
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 1
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 2
+		AND "CuentaContableId" = 1000
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc02"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 2
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 2
+		AND "CuentaContableId" = 1000
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc03"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 3
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 2
+		AND "CuentaContableId" = 1000
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc04"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 4
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 2
+		AND "CuentaContableId" = 1000
+		),
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT
+		'Melate Pagos' AS "Concepto",
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 1
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 2
+		AND "CuentaContableId" = 13000
+		AND "SubcuentaContableId" = '001'
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc02"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 2
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 2
+		AND "CuentaContableId" = 13000
+		AND "SubcuentaContableId" = '001'
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc03"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 3
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 2
+		AND "CuentaContableId" = 13000
+		AND "SubcuentaContableId" = '001'
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc04"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 4
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 2
+		AND "CuentaContableId" = 13000
+		AND "SubcuentaContableId" = '001'
+		),
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT
+		'Melate Pagos Clientes' AS "Concepto",
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 1
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 2
+		AND "CuentaContableId" = 13000
+		AND "SubcuentaContableId" = '002'
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc02"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 2
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 2
+		AND "CuentaContableId" = 13000
+		AND "SubcuentaContableId" = '002'
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc03"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 3
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 2
+		AND "CuentaContableId" = 13000
+		AND "SubcuentaContableId" = '002'
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc04"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 4
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 2
+		AND "CuentaContableId" = 13000
+		AND "SubcuentaContableId" = '002'
+		),
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT 
+		'** UTILIDAD MELATE' AS "Concepto",
+		0 AS "Suc01",
+		0 AS "Suc02",
+		0 AS "Suc03",
+		0 AS "Suc04",
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT
+		'RENTAS EMPRESA' AS "Concepto",
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 101
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 11
+		AND "CuentaContableId" = 1001
+		AND "SubcuentaContableId" = '001'
+		),
+		0 AS "Suc02",
+		0 AS "Suc03",
+		0 AS "Suc04",
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT
+		'OTROS GASTOS EMPRESA' AS "Concepto",
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 101
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 11
+		AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)
+		),
+		0 AS "Suc02",
+		0 AS "Suc03",
+		0 AS "Suc04",
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT 
+		'** UAIR' AS "Concepto",
+		0 AS "Suc01",
+		0 AS "Suc02",
+		0 AS "Suc03",
+		0 AS "Suc04",
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		`
+		response = await pool.query(sql,values)
+		data = response.rows
+		res.status(200).json(data)
+
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+
+})
+
+app.get('/api/estadoderesultadoslimpiaduriacifracontrol/:Periodo',authenticationToken,async(req,res) =>{
+	const Periodo = req.params.Periodo 
+
+	let values=[Periodo]
+	let sql = `SELECT  DISTINCT "PrimerDiaMes","UltimoDiaMes"
+				FROM dim_catalogo_tiempo
+				WHERE "Periodo" = $1 
+	`
+	let response = await pool.query(sql,values)
+	let data = response.rows 
+	const PrimerDiaMes = data[0].PrimerDiaMes 
+	const UltimoDiaMes = data[0].UltimoDiaMes
+
+
+	try{
+		values = [PrimerDiaMes,UltimoDiaMes]
+		sql = `
+		SELECT COALESCE(SUM("Monto"),0) AS "Monto"
+		FROM registro_contable rc
+		WHERE "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" NOT IN (3,4,5)
+		`
+		response = await pool.query(sql,values)
+		data = response.rows
+		res.status(200).json(data)
+
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+
 })
 
 function authenticationToken(req, res, next) {
