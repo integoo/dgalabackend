@@ -3605,6 +3605,162 @@ app.get('/api/estadoderesultadoslimpiaduriacifracontrol/:Periodo',authentication
 
 })
 
+app.get('/api/consultaaniosactivos',authenticationToken,async(req,res) =>{
+	const sql = `SELECT DISTINCT EXTRACT(YEAR FROM "Fecha") AS "Year"
+				FROM registro_contable
+				ORDER BY 1 DESC
+	`
+	try{
+		const response = await pool.query(sql)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/consultaperiodosporanio/:anio',authenticationToken,async(req,res) =>{
+	const anio = req.params.anio
+
+	const values = [anio]
+	const sql = `SELECT DISTINCT "Periodo" AS "Periodo"
+				FROM dim_catalogo_tiempo
+				WHERE "Año" = $1
+				ORDER BY 1 
+	`
+	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/consultalimpiaduriaventaspormes/:anio',authenticationToken,async(req,res) =>{
+	const anio = req.params.anio
+
+	const values = [anio]
+	const sql = `SELECT EXTRACT(MONTH FROM dim."Fecha") AS "Mes",
+				COALESCE(SUM("Monto"),0) AS "Monto"
+				FROM dim_catalogo_tiempo dim 
+				LEFT JOIN registro_contable rc ON rc."Fecha" = dim."Fecha" 
+								AND "UnidadDeNegocioId" = 1 AND "CuentaContableId" = 1000
+				WHERE dim."Año" = $1
+				GROUP BY EXTRACT(MONTH FROM dim."Fecha")
+				UNION ALL
+				SELECT 13 AS "Mes",
+				COALESCE(SUM("Monto"),0) AS "Monto"
+				FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = $1
+				AND "UnidadDeNegocioId" = 1 AND "CuentaContableId" = 1000
+				GROUP BY "Mes"
+				ORDER BY 1 ;
+	`
+	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/consultalimpiaduriaegresospormes/:anio',authenticationToken,async(req,res) =>{
+	const anio = req.params.anio
+
+	const values = [anio]
+	const sql = `SELECT EXTRACT(MONTH FROM dim."Fecha") AS "Mes",
+				COALESCE(SUM("Monto"),0) AS "Monto"
+				FROM dim_catalogo_tiempo dim 
+				LEFT JOIN registro_contable rc ON rc."Fecha" = dim."Fecha" 
+								AND "UnidadDeNegocioId" IN (1,10,11) 
+								AND "CuentaContableId" NOT BETWEEN 1000 AND 1999
+				WHERE dim."Año" = $1
+				GROUP BY EXTRACT(MONTH FROM dim."Fecha")
+				UNION ALL
+				SELECT 13 AS "Mes",
+				COALESCE(SUM("Monto"),0) AS "Monto"
+				FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = $1
+				AND "UnidadDeNegocioId" IN (1,10,11)
+				AND "CuentaContableId" NOT BETWEEN 1000 AND 1999
+				GROUP BY "Mes"
+				ORDER BY 1 ;
+	`
+	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+app.get('/api/consultamelateventaspormes/:anio',authenticationToken,async(req,res) =>{
+	const anio = req.params.anio
+
+	const values = [anio]
+	const sql = `SELECT EXTRACT(MONTH FROM dim."Fecha") AS "Mes",
+				COALESCE(SUM("Monto"),0) AS "Monto"
+				FROM dim_catalogo_tiempo dim 
+				LEFT JOIN registro_contable rc ON rc."Fecha" = dim."Fecha" 
+								AND "UnidadDeNegocioId" = 2 AND "CuentaContableId" = 1000
+				WHERE dim."Año" = $1
+				GROUP BY EXTRACT(MONTH FROM dim."Fecha")
+				UNION ALL
+				SELECT 13 AS "Mes",
+				COALESCE(SUM("Monto"),0) AS "Monto"
+				FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = $1
+				AND "UnidadDeNegocioId" = 2 AND "CuentaContableId" = 1000
+				GROUP BY "Mes"
+				ORDER BY 1 ;
+	`
+	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/consultamelateegresospormes/:anio',authenticationToken,async(req,res) =>{
+	const anio = req.params.anio
+
+	const values = [anio]
+	const sql = `SELECT EXTRACT(MONTH FROM dim."Fecha") AS "Mes",
+				COALESCE(SUM("Monto"),0) AS "Monto"
+				FROM dim_catalogo_tiempo dim 
+				LEFT JOIN registro_contable rc ON rc."Fecha" = dim."Fecha" 
+								AND "UnidadDeNegocioId" IN (2) 
+								AND "CuentaContableId" NOT BETWEEN 1000 AND 1999
+				WHERE dim."Año" = $1
+				GROUP BY EXTRACT(MONTH FROM dim."Fecha")
+				UNION ALL
+				SELECT 13 AS "Mes",
+				COALESCE(SUM("Monto"),0) AS "Monto"
+				FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = $1
+				AND "UnidadDeNegocioId" IN (2)
+				AND "CuentaContableId" NOT BETWEEN 1000 AND 1999
+				GROUP BY "Mes"
+				ORDER BY 1 ;
+	`
+	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+
+
+
 function authenticationToken(req, res, next) {
     const authHeader = req.headers['authorization']
     const token = authHeader && authHeader.split(' ')[1]
