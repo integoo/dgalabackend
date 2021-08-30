@@ -3888,6 +3888,34 @@ app.get('/api/gastosinversionesporanio/:year',authenticationToken,async (req,res
 	}
 })
 
+app.get('/api/consultagastosinversionperiodo/:Periodo',authenticationToken,async(req,res) =>{
+	const Periodo = req.params.Periodo 
+
+	
+	try{
+		const values = [Periodo]
+		
+		const sql = `SELECT 0 AS "Posicion", rc."SucursalId",s."Sucursal",udn."UnidadDeNegocio",rc."CuentaContableId","CuentaContable","SubcuentaContable",rc."Comentarios",rc."Monto",CAST (rc."FechaHora" AS CHAR(16)),rc."Usuario"
+		FROM registro_contable rc
+		INNER JOIN cuentas_contables cc ON cc."CuentaContableId" = rc."CuentaContableId"
+		INNER JOIN subcuentas_contables scc ON scc."CuentaContableId" = rc."CuentaContableId" AND scc."SubcuentaContableId" = rc."SubcuentaContableId"
+		INNER JOIN sucursales s ON s."SucursalId" = rc."SucursalId"
+		INNER JOIN unidades_de_negocio udn ON udn."UnidadDeNegocioId" = rc."UnidadDeNegocioId"
+		WHERE rc."UnidadDeNegocioId" IN (1,2,10,11)
+		AND "Periodo" = $1
+		ORDER BY rc."FechaHora"`
+
+		const response = await pool.query(sql,values)
+		const data = response.rows
+
+		res.status(200).json(data)
+
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
 
 
 function authenticationToken(req, res, next) {
