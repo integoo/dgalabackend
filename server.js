@@ -3759,6 +3759,135 @@ app.get('/api/consultamelateegresospormes/:anio',authenticationToken,async(req,r
 })
 
 
+app.get('/api/gastosinversionesporanio/:year',authenticationToken,async (req,res) =>{
+	const year = req.params.year
+	const values = [year]
+
+	try{
+		const sql = `
+		SELECT 0 AS id, cc."CuentaContableId",cc."CuentaContable",scc."SubcuentaContable",
+		(SELECT COALESCE(SUM("Monto"),0) AS "Ene"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(MONTH FROM "Fecha") = 1
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Feb"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(MONTH FROM "Fecha") = 2
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Mar"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(MONTH FROM "Fecha") = 3
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Abr"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(MONTH FROM "Fecha") = 4
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "May"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(MONTH FROM "Fecha") = 5
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Jun"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(MONTH FROM "Fecha") = 6
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Jul"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(MONTH FROM "Fecha") = 7
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Ago"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(MONTH FROM "Fecha") = 8
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Sep"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(MONTH FROM "Fecha") = 9
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Oct"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(MONTH FROM "Fecha") = 10
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Nov"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(MONTH FROM "Fecha") = 11
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Dic"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(MONTH FROM "Fecha") = 12
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		(SELECT COALESCE(SUM("Monto"),0) AS "Total"
+		FROM registro_contable rc
+		WHERE rc."CuentaContableId" = scc."CuentaContableId"
+		AND rc."SubcuentaContableId" = scc."SubcuentaContableId"
+		AND rc."UnidadDeNegocioId" IN (1,10,11) 
+		AND EXTRACT(YEAR FROM "Fecha") = $1
+		),
+		0 AS "PorcentajeSimple"
+
+		FROM cuentas_contables cc
+		INNER JOIN subcuentas_contables scc ON scc."CuentaContableId" = cc."CuentaContableId"
+		WHERE cc."CuentaContableId" >= 2000
+		ORDER BY cc."CuentaContableId",scc."SubcuentaContable"
+		`
+	//664 634-00-77 Nucleo Radiológico Zona Rio.
+	//664 971-09-41 Imagen Integral.
+
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
 
 
 function authenticationToken(req, res, next) {
