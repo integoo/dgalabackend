@@ -4139,6 +4139,109 @@ app.get('/api/ventas/bi/decorafiestas/:year',authenticationToken,async(req,res) 
 	}
 })
 
+app.get('/api/limpiaduria/bi/estadoresultadoslimpiadurianegocios/:year',authenticationToken,async(req,res) =>{
+	const year = parseInt(req.params.year)
+	try{
+		const values = [year]
+		const sql = `SELECT 'Limpiaduria Utilidad' AS "Negocio",dim."Año",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 1 AND "UnidadDeNegocioId" IN (1,10)) "Ene",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 2 AND "UnidadDeNegocioId" IN (1,10)) "Feb",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 3 AND "UnidadDeNegocioId" IN (1,10)) "Mar",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 4 AND "UnidadDeNegocioId" IN (1,10)) "Abr",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 5 AND "UnidadDeNegocioId" IN (1,10)) "May",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 6 AND "UnidadDeNegocioId" IN (1,10)) "Jun",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 7 AND "UnidadDeNegocioId" IN (1,10)) "Jul",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 8 AND "UnidadDeNegocioId" IN (1,10)) "Ago",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 9 AND "UnidadDeNegocioId" IN (1,10)) "Sep",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 10 AND "UnidadDeNegocioId" IN (1,10)) "Oct",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 11 AND "UnidadDeNegocioId" IN (1,10)) "Nov",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 12 AND "UnidadDeNegocioId" IN (1,10)) "Dic",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") < 13 AND "UnidadDeNegocioId" IN (1,10)) "Total"
+		FROM dim_catalogo_tiempo dim
+		WHERE dim."Año" = $1
+		GROUP BY "Negocio",dim."Año"
+		UNION ALL
+		SELECT 'Melate Utilidad' AS "Negocio",dim."Año",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 1 AND "UnidadDeNegocioId" IN (2)) "Ene",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 2 AND "UnidadDeNegocioId" IN (2)) "Feb",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 3 AND "UnidadDeNegocioId" IN (2)) "Mar",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 4 AND "UnidadDeNegocioId" IN (2)) "Abr",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 5 AND "UnidadDeNegocioId" IN (2)) "May",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 6 AND "UnidadDeNegocioId" IN (2)) "Jun",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 7 AND "UnidadDeNegocioId" IN (2)) "Jul",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 8 AND "UnidadDeNegocioId" IN (2)) "Ago",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 9 AND "UnidadDeNegocioId" IN (2)) "Sep",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 10 AND "UnidadDeNegocioId" IN (2)) "Oct",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 11 AND "UnidadDeNegocioId" IN (2)) "Nov",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 12 AND "UnidadDeNegocioId" IN (2)) "Dic",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") < 13 AND "UnidadDeNegocioId" IN (2)) "Total"
+		FROM dim_catalogo_tiempo dim
+		WHERE dim."Año" = $1
+		GROUP BY "Negocio",dim."Año"
+		UNION ALL
+		SELECT 'Rentas' AS "Negocio",dim."Año",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 1 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "Ene",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 2 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "Feb",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 3 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "Mar",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 4 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "Abr",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 5 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "May",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 6 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "Jun",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 7 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "Jul",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 8 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "Ago",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 9 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "Sep",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 10 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "Oct",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 11 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "Nov",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 12 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "Dic",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") < 13 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1001) "Total"
+		FROM dim_catalogo_tiempo dim
+		WHERE dim."Año" = $1
+		GROUP BY "Negocio",dim."Año"
+		UNION ALL
+		SELECT 'Otros Ingresos' AS "Negocio",dim."Año",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 1 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "Ene",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 2 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "Feb",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 3 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "Mar",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 4 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "Abr",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 5 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "May",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 6 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "Jun",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 7 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "Jul",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 8 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "Ago",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 9 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "Sep",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 10 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "Oct",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 11 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "Nov",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 12 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "Dic",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") < 13 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" = 1002) "Total"
+		FROM dim_catalogo_tiempo dim
+		WHERE dim."Año" = $1
+		GROUP BY "Negocio",dim."Año"
+		UNION ALL
+		SELECT 'Otros Gastos' AS "Negocio",dim."Año",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 1 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "Ene",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 2 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "Feb",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 3 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "Mar",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 4 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "Abr",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 5 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "May",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 6 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "Jun",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 7 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "Jul",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 8 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "Ago",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 9 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "Sep",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 10 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "Oct",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 11 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "Nov",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") = 12 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "Dic",
+		(SELECT COALESCE(SUM("Monto"),0) FROM registro_contable rc WHERE EXTRACT(YEAR FROM rc."Fecha") = dim."Año" AND EXTRACT(MONTH FROM "Fecha") < 13 AND "UnidadDeNegocioId" IN (11) AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)) "Total"
+		FROM dim_catalogo_tiempo dim
+		WHERE dim."Año" = $1
+		GROUP BY "Negocio",dim."Año"
+		`
+
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
 
 
 function authenticationToken(req, res, next) {
