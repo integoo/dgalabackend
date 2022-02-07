@@ -3916,6 +3916,229 @@ app.get('/api/consultagastosinversionperiodo/:Periodo',authenticationToken,async
 	}
 })
 
+app.get('/api/ventas/bi/lavamatica/:year',authenticationToken,async(req,res) =>{
+	const ejercicio = req.params.year
+
+	try{
+		const values = [ejercicio]
+		const sql = `SELECT 1 AS "Numero",'VentasConImpuesto' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"PrecioVentaConImpuesto"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 3 AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Mes"
+			UNION ALL
+			SELECT 2 AS "Numero",'Impuestos' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"PrecioVentaConImpuesto" - "UnidadesVendidas" * "PrecioVentaSinImpuesto"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 3  AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+			UNION ALL
+			SELECT 3 AS "Numero",'VentasSinImpuesto' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"PrecioVentaSinImpuesto"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 3  AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+			UNION ALL
+			SELECT 4 AS "Numero",'CostoDeVentas' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 3  AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+			UNION ALL
+			SELECT 5 AS "Numero",'UtilidadBruta' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"PrecioVentaSinImpuesto" - "UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 3  AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+			UNION ALL
+			SELECT 6 AS "Numero",'Egresos' AS "Transaccion","Mes",
+			COALESCE(SUM("Monto"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN registro_contable rc ON m."Mes" = EXTRACT(MONTH FROM rc."Fecha")
+					AND rc."CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" =-1)
+					AND rc."UnidadDeNegocioId" = 3  AND EXTRACT(YEAR FROM rc."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+
+			UNION ALL
+			SELECT 7 AS "Numero",'UtilidadNeta'AS "Transaccion",u."Mes",SUM(u."Monto"+e."Monto") FROM (
+				SELECT 5 AS "Numero",'UtilidadBruta' AS "Transaccion","Mes",
+						COALESCE(SUM("UnidadesVendidas"*"PrecioVentaSinImpuesto" - "UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
+						FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+						LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 3  AND EXTRACT(YEAR FROM v."Fecha") = $1
+				GROUP BY "Numero","Transaccion","Mes") AS u
+				INNER JOIN
+				(SELECT 6 AS "Numero",'Egresos' AS "Transaccion","Mes",
+						COALESCE(SUM("Monto"),0) AS "Monto"
+						FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+						LEFT JOIN registro_contable rc ON m."Mes" = EXTRACT(MONTH FROM rc."Fecha")
+						AND rc."CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" =-1)
+						AND rc."UnidadDeNegocioId" = 3  AND EXTRACT(YEAR FROM rc."Fecha") = $1
+				GROUP BY "Numero","Transaccion","Mes") AS e ON u."Mes" = e."Mes"
+				GROUP BY u."Numero",u."Transaccion",u."Mes"
+
+
+
+			ORDER BY "Numero","Transaccion","Mes"
+		`
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/ventas/bi/tienda/:year',authenticationToken,async(req,res) =>{
+	const ejercicio = req.params.year
+
+	try{
+		const values = [ejercicio]
+		const sql = `SELECT 1 AS "Numero",'VentasConImpuesto' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"PrecioVentaConImpuesto"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" NOT IN (1,3) AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Mes"
+			UNION ALL
+			SELECT 2 AS "Numero",'Impuestos' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"PrecioVentaConImpuesto" - "UnidadesVendidas" * "PrecioVentaSinImpuesto"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" NOT IN (1,3)  AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+			UNION ALL
+			SELECT 3 AS "Numero",'VentasSinImpuesto' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"PrecioVentaSinImpuesto"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" NOT IN (1,3)  AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+			UNION ALL
+			SELECT 4 AS "Numero",'CostoDeVentas' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" NOT IN (1,3) AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+			UNION ALL
+			SELECT 5 AS "Numero",'UtilidadBruta' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"PrecioVentaSinImpuesto" - "UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" NOT IN (1,3)  AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+			UNION ALL
+			SELECT 6 AS "Numero",'Egresos' AS "Transaccion","Mes",
+			COALESCE(SUM("Monto"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN registro_contable rc ON m."Mes" = EXTRACT(MONTH FROM rc."Fecha")
+					AND rc."CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" =-1)
+					AND rc."UnidadDeNegocioId" = 5  AND EXTRACT(YEAR FROM rc."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+
+			UNION ALL
+			SELECT 7 AS "Numero",'UtilidadNeta'AS "Transaccion",u."Mes",SUM(u."Monto"+e."Monto") FROM (
+				SELECT 5 AS "Numero",'UtilidadBruta' AS "Transaccion","Mes",
+						COALESCE(SUM("UnidadesVendidas"*"PrecioVentaSinImpuesto" - "UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
+						FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+						LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" NOT IN (1,3) AND EXTRACT(YEAR FROM v."Fecha") = $1
+				GROUP BY "Numero","Transaccion","Mes") AS u
+				INNER JOIN
+				(SELECT 6 AS "Numero",'Egresos' AS "Transaccion","Mes",
+						COALESCE(SUM("Monto"),0) AS "Monto"
+						FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+						LEFT JOIN registro_contable rc ON m."Mes" = EXTRACT(MONTH FROM rc."Fecha")
+						AND rc."CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" =-1)
+						AND rc."UnidadDeNegocioId" = 5  AND EXTRACT(YEAR FROM rc."Fecha") = $1
+				GROUP BY "Numero","Transaccion","Mes") AS e ON u."Mes" = e."Mes"
+				GROUP BY u."Numero",u."Transaccion",u."Mes"
+
+
+
+			ORDER BY "Numero","Transaccion","Mes"
+		`
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+
+app.get('/api/ventas/bi/decorafiestas/:year',authenticationToken,async(req,res) =>{
+	const ejercicio = req.params.year
+
+	try{
+		const values = [ejercicio]
+		const sql = `SELECT 1 AS "Numero",'VentasConImpuesto' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"PrecioVentaConImpuesto"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 1 AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Mes"
+			UNION ALL
+			SELECT 2 AS "Numero",'Impuestos' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"PrecioVentaConImpuesto" - "UnidadesVendidas" * "PrecioVentaSinImpuesto"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 1  AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+			UNION ALL
+			SELECT 3 AS "Numero",'VentasSinImpuesto' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"PrecioVentaSinImpuesto"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 1  AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+			UNION ALL
+			SELECT 4 AS "Numero",'CostoDeVentas' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 1 AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+			UNION ALL
+			SELECT 5 AS "Numero",'UtilidadBruta' AS "Transaccion","Mes",
+			COALESCE(SUM("UnidadesVendidas"*"PrecioVentaSinImpuesto" - "UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 1  AND EXTRACT(YEAR FROM v."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+			UNION ALL
+			SELECT 6 AS "Numero",'Egresos' AS "Transaccion","Mes",
+			COALESCE(SUM("Monto"),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN registro_contable rc ON m."Mes" = EXTRACT(MONTH FROM rc."Fecha")
+					AND rc."CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" =-1)
+					AND rc."UnidadDeNegocioId" = 4  AND EXTRACT(YEAR FROM rc."Fecha") = $1
+			GROUP BY "Numero","Transaccion","Mes"
+
+			UNION ALL
+			SELECT 7 AS "Numero",'UtilidadNeta'AS "Transaccion",u."Mes",SUM(u."Monto"+e."Monto") FROM (
+				SELECT 5 AS "Numero",'UtilidadBruta' AS "Transaccion","Mes",
+						COALESCE(SUM("UnidadesVendidas"*"PrecioVentaSinImpuesto" - "UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
+						FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+						LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 1 AND EXTRACT(YEAR FROM v."Fecha") = $1
+				GROUP BY "Numero","Transaccion","Mes") AS u
+				INNER JOIN
+				(SELECT 6 AS "Numero",'Egresos' AS "Transaccion","Mes",
+						COALESCE(SUM("Monto"),0) AS "Monto"
+						FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+						LEFT JOIN registro_contable rc ON m."Mes" = EXTRACT(MONTH FROM rc."Fecha")
+						AND rc."CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" =-1)
+						AND rc."UnidadDeNegocioId" = 4  AND EXTRACT(YEAR FROM rc."Fecha") = $1
+				GROUP BY "Numero","Transaccion","Mes") AS e ON u."Mes" = e."Mes"
+				GROUP BY u."Numero",u."Transaccion",u."Mes"
+
+
+
+			ORDER BY "Numero","Transaccion","Mes"
+		`
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
 
 
 function authenticationToken(req, res, next) {
