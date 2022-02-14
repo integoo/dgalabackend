@@ -3959,8 +3959,23 @@ app.get('/api/ventas/bi/lavamatica/:year',authenticationToken,async(req,res) =>{
 					AND rc."UnidadDeNegocioId" = 3  AND EXTRACT(YEAR FROM rc."Fecha") = $1
 			GROUP BY "Numero","Transaccion","Mes"
 
+
+
+
 			UNION ALL
-			SELECT 7 AS "Numero",'UtilidadNeta'AS "Transaccion",u."Mes",SUM(u."Monto"+e."Monto") FROM (
+			SELECT 7 AS "Numero",'ComisionesVenta' AS "Transaccion","Mes",
+			COALESCE(ROUND(SUM(v."UnidadesVendidas"*v."ComisionVenta")),0) AS "Monto"
+			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 3 AND EXTRACT(YEAR FROM v."Fecha") = $1
+					AND v."CodigoId" = 65 
+			GROUP BY "Mes"
+
+
+
+
+
+			UNION ALL
+			SELECT 8 AS "Numero",'UtilidadNeta'AS "Transaccion",u."Mes",SUM(u."Monto"+e."Monto"-f."Monto") FROM (
 				SELECT 5 AS "Numero",'UtilidadBruta' AS "Transaccion","Mes",
 						COALESCE(SUM("UnidadesVendidas"*"PrecioVentaSinImpuesto" - "UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
 						FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
@@ -3974,6 +3989,18 @@ app.get('/api/ventas/bi/lavamatica/:year',authenticationToken,async(req,res) =>{
 						AND rc."CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" =-1)
 						AND rc."UnidadDeNegocioId" = 3  AND EXTRACT(YEAR FROM rc."Fecha") = $1
 				GROUP BY "Numero","Transaccion","Mes") AS e ON u."Mes" = e."Mes"
+
+
+				INNER JOIN
+				(SELECT 7 AS "Numero",'ComisionesVenta' AS "Transaccion","Mes",
+						COALESCE(SUM(v."UnidadesVendidas"*v."ComisionVenta"),0) AS "Monto"
+						FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
+						LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 3  AND EXTRACT(YEAR FROM v."Fecha") = $1
+				GROUP BY "Numero","Transaccion","Mes") AS f ON u."Mes" = f."Mes"
+
+
+
+
 				GROUP BY u."Numero",u."Transaccion",u."Mes"
 
 
