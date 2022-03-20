@@ -90,12 +90,6 @@ app.post('/login',async (req, res)=>{
 })
 
 app.get('/api/sucursales/:naturalezaCC',authenticationToken,async(req, res) => {
-	/*let sql = `SELECT "SucursalId","Sucursal" AS "Sucursal","SucursalNombre","TipoSucursal" FROM sucursales 
-		   WHERE "Status" = $1
-		   ORDER BY "SucursalId"
-	`
-	*/
-
 	let naturalezaCC = req.params.naturalezaCC;
 	
 	let sql = `SELECT DISTINCT s."SucursalId", s."Sucursal", "SucursalNombre", "TipoSucursal" FROM sucursales s
@@ -135,13 +129,6 @@ app.get('/api/fechaactual',authenticationToken,async(req,res) =>{
 
 app.get('/ingresos/unidadesdenegociocatalogo/:naturalezaCC',authenticationToken,async(req, res) => {
 	let naturalezaCC = req.params.naturalezaCC;
-
-	/*let sql = `SELECT DISTINCT cc."SucursalId", udn."UnidadDeNegocioId", udn."UnidadDeNegocio" 
-			FROM unidades_de_negocio udn
-			INNER JOIN catalogo_contable cc ON cc."UnidadDeNegocioId" = udn."UnidadDeNegocioId"
-			ORDER BY udn."UnidadDeNegocioId"
-	`
-	*/
 
 	let sql = `SELECT DISTINCT cc."SucursalId", udn."UnidadDeNegocioId", udn."UnidadDeNegocio" 
 		FROM unidades_de_negocio udn
@@ -184,14 +171,6 @@ app.get('/ingresos/unidadesdenegocio/:sucursal',authenticationToken,async(req, r
 
 app.get('/ingresos/cuentascontablescatalogo/:naturalezaCC',authenticationToken, async(req, res) => {
 	let naturalezaCC = req.params.naturalezaCC;
-
-	/*let sql = `SELECT DISTINCT cac."SucursalId",cac."UnidadDeNegocioId",cc."CuentaContableId",cc."CuentaContable",cc."NaturalezaCC"
-			FROM cuentas_contables cc
-        		INNER JOIN catalogo_contable cac ON cac."CuentaContableId" = cc."CuentaContableId"
-			ORDER BY cc."CuentaContableId"
-	`
-	*/
-
 
 
 	let sql = `SELECT DISTINCT cac."SucursalId",cac."UnidadDeNegocioId", cc."CuentaContableId",cc."CuentaContable",cc."NaturalezaCC" 
@@ -236,13 +215,6 @@ app.get('/ingresos/cuentascontables/:sucursal/:unidaddenegocio',authenticationTo
 
 app.get('/ingresos/subcuentascontablescatalogo/:naturalezaCC',authenticationToken, async(req,res) => {
 	const naturalezaCC = req.params.naturalezaCC;
-
-	/*let sql = `SELECT DISTINCT cc."SucursalId",cc."UnidadDeNegocioId",cc."CuentaContableId", cc."SubcuentaContableId", scc."SubcuentaContable"
-			FROM subcuentas_contables scc
-			INNER JOIN catalogo_contable cc ON cc."CuentaContableId" = scc."CuentaContableId" AND cc."SubcuentaContableId" = scc."SubcuentaContableId"
-	`
-	*/
-
 
 	let sql = `SELECT DISTINCT cc."SucursalId",cc."UnidadDeNegocioId",scc."CuentaContableId", scc."SubcuentaContableId", scc."SubcuentaContable"
 		FROM subcuentas_contables scc
@@ -4263,6 +4235,117 @@ app.get('/api/limpiaduria/bi/estadoresultadoslimpiadurianegocios/:year',authenti
 
 		const response = await pool.query(sql,values)
 		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/consultainvnetarioperpetuohistoriaporperiodo/:year',authenticationToken,async(req, res) =>{
+	const year = req.params.year 
+	const values = [year]
+	try{
+		const sql = `SELECT 'Inventario Perpetuo' AS "Transaccion",
+		
+		            (SELECT 
+					COALESCE(SUM("UnidadesInventario"*"CostoPromedio"),0) AS "Ene"
+					FROM inventario_perpetuo_historia iph 
+					INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = iph."FechaRespaldo" 
+					WHERE ct."Año" = $1
+					AND ct."Mes" = 1
+					),
+					
+					(SELECT
+					COALESCE(SUM("UnidadesInventario"*"CostoPromedio"),0) AS "Feb"
+					FROM inventario_perpetuo_historia iph 
+					INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = iph."FechaRespaldo" 
+					WHERE ct."Año" = $1
+					AND ct."Mes" = 2
+					),
+					
+					(SELECT 
+					COALESCE(SUM("UnidadesInventario"*"CostoPromedio"),0) AS "Mar"
+					FROM inventario_perpetuo_historia iph 
+					INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = iph."FechaRespaldo" 
+					WHERE ct."Año" = $1
+					AND ct."Mes" = 3
+					),
+					
+					(SELECT
+					COALESCE(SUM("UnidadesInventario"*"CostoPromedio"),0) AS "Abr"
+					FROM inventario_perpetuo_historia iph 
+					INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = iph."FechaRespaldo" 
+					WHERE ct."Año" = $1
+					AND ct."Mes" = 4
+					),
+					
+					(SELECT
+					COALESCE(SUM("UnidadesInventario"*"CostoPromedio"),0) AS "May"
+					FROM inventario_perpetuo_historia iph 
+					INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = iph."FechaRespaldo" 
+					WHERE ct."Año" = $1
+					AND ct."Mes" = 5
+					),
+					
+					(SELECT
+					COALESCE(SUM("UnidadesInventario"*"CostoPromedio"),0) AS "Jun"
+					FROM inventario_perpetuo_historia iph 
+					INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = iph."FechaRespaldo" 
+					WHERE ct."Año" = $1
+					AND ct."Mes" = 6
+					),
+					
+					(SELECT 
+					COALESCE(SUM("UnidadesInventario"*"CostoPromedio"),0) AS "Jul"
+					FROM inventario_perpetuo_historia iph 
+					INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = iph."FechaRespaldo" 
+					WHERE ct."Año" = $1
+					AND ct."Mes" = 7
+					),
+					
+					(SELECT 
+					COALESCE(SUM("UnidadesInventario"*"CostoPromedio"),0) AS "Ago"
+					FROM inventario_perpetuo_historia iph 
+					INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = iph."FechaRespaldo" 
+					WHERE ct."Año" = $1
+					AND ct."Mes" = 8
+					),
+					
+					(SELECT 
+					COALESCE(SUM("UnidadesInventario"*"CostoPromedio"),0) AS "Sep"
+					FROM inventario_perpetuo_historia iph 
+					INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = iph."FechaRespaldo" 
+					WHERE ct."Año" = $1
+					AND ct."Mes" = 9
+					),
+					
+					(SELECT
+					COALESCE(SUM("UnidadesInventario"*"CostoPromedio"),0) AS "Oct"
+					FROM inventario_perpetuo_historia iph 
+					INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = iph."FechaRespaldo" 
+					WHERE ct."Año" = $1
+					AND ct."Mes" = 10
+					),
+					
+					(SELECT
+					COALESCE(SUM("UnidadesInventario"*"CostoPromedio"),0) AS "Nov"
+					FROM inventario_perpetuo_historia iph 
+					INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = iph."FechaRespaldo" 
+					WHERE ct."Año" = $1
+					AND ct."Mes" = 11
+					),
+					
+					(SELECT
+					COALESCE(SUM("UnidadesInventario"*"CostoPromedio"),0) AS "Dic"
+					FROM inventario_perpetuo_historia iph 
+					INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = iph."FechaRespaldo" 
+					WHERE ct."Año" = $1
+					AND ct."Mes" = 12
+					)
+					`
+		const response = await pool.query(sql,values)
+		const data = response.rows 
 		res.status(200).json(data)
 	}catch(error){
 		console.log(error.message)
