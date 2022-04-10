@@ -1060,7 +1060,7 @@ app.post('/api/grabaventas',authenticationToken, async(req, res)=>{
 			values = [SucursalId, CodigoId, UnidadesVendidas,Usuario]
 			sql = `UPDATE inventario_perpetuo
 				SET "UnidadesInventario" = "UnidadesInventario" - $3,
-					"FechaUltimaVenta" = CURRENT_DATE,
+					"FechaUltimaVenta" = NOW(),
 					"FechaHora" = CLOCK_TIMESTAMP(),
 					"Usuario" = $4
 				WHERE "SucursalId" = $1 AND "CodigoId" = $2
@@ -1275,6 +1275,7 @@ app.put('/api/cierraventa',authenticationToken, async(req,res) => {
 				values = [SucursalId, CodigoId, UnidadesInventarioDespues,Usuario]
 				sql = `UPDATE inventario_perpetuo
 					SET "UnidadesInventario" = $3,
+					"FechaUltimaVenta" = CURRENT_DATE,
 					"FechaHora" = CLOCK_TIMESTAMP(),
 					"Usuario" = $4
 					WHERE "SucursalId" = $1 AND "CodigoId" = $2
@@ -2253,6 +2254,7 @@ app.post('/api/grabaajustesinventario',authenticationToken,async(req,res) => {
 		values = [SucursalId,CodigoId,UnidadesInventarioDespues,Usuario]
 		sql = `UPDATE inventario_perpetuo
  			SET "UnidadesInventario" = $3,
+			 	"FechaUltimoAjuste" = CURRENT_DATE,
 				"FechaHora" = CLOCK_TIMESTAMP(),
 				"Usuario" = $4
 			WHERE "SucursalId" = $1
