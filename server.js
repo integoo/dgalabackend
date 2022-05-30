@@ -1,3 +1,7 @@
+//Para generar .env ACCESS_TOKEN_SECRET=
+//node <enter>
+//require("crypto").randomBytes(64).toString("hex")
+
 require('dotenv').config()
 const express = require('express')
 const app = express()
@@ -4353,6 +4357,40 @@ app.get('/api/consultainvnetarioperpetuohistoriaporperiodo/:year',authentication
 		console.log(error.message)
 		res.status(500).json({"error": error.message})
 	}
+})
+
+app.get('/api/inventariofaltantes/:SucursalId',authenticationToken,async(req, res) => {
+	const SucursalId = parseInt(req.params.SucursalId)
+	const values = [SucursalId] 
+	const sql = `
+		SELECT ip."SucursalId",
+		vw."CodigoId",
+		CAST(vw."Descripcion" AS VARCHAR(70)),
+		ip."Maximo",
+		ip."Minimo",
+		ip."UnidadesInventario" AS "UniInv",
+		COALESCE(SUM(CAST(v."UnidadesVendidas" AS INT)),0) AS "UnidadesDesplazadas",
+		(SELECT ip2."UnidadesInventario" FROM inventario_perpetuo ip2 WHERE ip2."CodigoId" = vw."CodigoId" AND ip2."SucursalId" = 99) AS "UniInvCedis"
+		FROM vw_productos_descripcion vw
+		INNER JOIN inventario_perpetuo ip  ON vw."CodigoId" = ip."CodigoId"
+		INNER JOIN productos p ON vw."CodigoId" = p."CodigoId"
+		LEFT JOIN ventas v ON v."SucursalId" = ip."SucursalId" AND v."CodigoId" = ip."CodigoId" AND v."Fecha" >= CURRENT_DATE - 35 AND v."Status" = 'V'
+		WHERE ip."UnidadesInventario" < ip."Minimo"
+		AND ip."Minimo" > 0
+		AND p."CategoriaId" <> 1
+		AND (ip."FechaUltimaCompra" IS NOT NULL OR ip."FechaUltimoTraspasoEntrada" IS NOT NULL OR ip."FechaUltimoAjuste" IS NOT NULL)
+		AND ip."SucursalId" IN (SELECT "SucursalId" FROM sucursales WHERE "TipoSucursal" IN ('S','C') AND "SucursalId" = $1 )
+		GROUP BY ip."SucursalId",vw."CodigoId",vw."Descripcion",p."CategoriaId",ip."Maximo",ip."Minimo",ip."UnidadesInventario"
+		ORDER BY ip."SucursalId",p."CategoriaId", ip."UnidadesInventario" DESC
+		`
+		try{
+			const response = await pool.query(sql,values)
+			const data = response.rows
+			res.status(200).json(data)
+		}catch(error){
+			console.log(error.message)
+			res.status(500).json({"error": error.message})
+		}
 })
 
 
