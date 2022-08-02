@@ -520,6 +520,14 @@ app.get('/api/catalogos/:id',authenticationToken,async (req,res) => {
 	if (id === '10'){
 		sql = `SELECT "SucursalId","Sucursal" FROM sucursales WHERE "Status" = 'A' AND "TipoSucursal" IN ('S','C') ORDER BY "SucursalId"`
 	}
+	if (id === '10todasyfisicas'){
+		sql = `
+                       SELECT '00' AS "SucursalId",'00 TODAS' AS "Sucursal"
+                       UNION ALL
+                       SELECT "SucursalId","Sucursal" 
+                       FROM sucursales WHERE "Status" = 'A' AND "TipoSucursal" IN ('S')
+                       AND "SucursalId" != 4 ORDER BY "SucursalId"`
+	}
 	if (id === '11'){
 		sql = `SELECT "ProveedorId","Proveedor","IVA" FROM proveedores WHERE "Status" = 'A' ORDER BY "ProveedorId"`
 	}
@@ -2617,6 +2625,7 @@ app.post('/api/grabatraspasosalida',authenticationToken,async(req,res) => {
 						"UnidadesInventario" = "UnidadesInventario" + $3,
 						"CostoCompra"= $4,
 						"CostoPromedio" = $5,
+						"Margen" = (CASE WHEN "Margen" = 100 THEN $6 ELSE "Margen" END),
 						"MargenReal" = $6,
 						"FechaUltimoTraspasoEntrada" = CLOCK_TIMESTAMP(),
 						"FechaHora" = CLOCK_TIMESTAMP(),
@@ -2632,6 +2641,7 @@ app.post('/api/grabatraspasosalida',authenticationToken,async(req,res) => {
 						"UnidadesInventario" = "UnidadesInventario" + $3,
 						"CostoCompra"= $4,
 						"CostoPromedio" = $5,
+						"Margen" = (CASE WHEN "Margen" = 100 THEN $6 ELSE "Margen" END),
 						"MargenReal" = $6,
 						"PrecioVentaSinImpuesto" = $7,
 						"PrecioVentaConImpuesto" = $8,
@@ -4382,6 +4392,63 @@ app.get('/api/inventariofaltantes/:SucursalId',authenticationToken,async(req, re
 		AND ip."SucursalId" IN (SELECT "SucursalId" FROM sucursales WHERE "TipoSucursal" IN ('S','C') AND "SucursalId" = $1 )
 		GROUP BY ip."SucursalId",vw."CodigoId",vw."Descripcion",p."CategoriaId",ip."Maximo",ip."Minimo",ip."UnidadesInventario"
 		ORDER BY ip."SucursalId",p."CategoriaId", ip."UnidadesInventario" DESC
+		`
+		try{
+			const response = await pool.query(sql,values)
+			const data = response.rows
+			res.status(200).json(data)
+		}catch(error){
+			console.log(error.message)
+			res.status(500).json({"error": error.message})
+		}
+})
+
+app.get('/api/lavadassecadasservicios/:SucursalId/:year',authenticationToken,async(req, res) => {
+		const SucursalId = req.params.SucursalId
+		let SucursalIdIni = 0
+		let SucursalIdFin = 0
+
+		if (SucursalId == 0){
+			SucursalIdIni = 1
+			SucursalIdFin = 1000
+		}else{
+			SucursalIdIni = SucursalId
+			SucursalIdFin = SucursalId
+		}
+
+		const year = req.params.year
+		const values = [SucursalIdIni,SucursalIdFin,year]
+		
+		const sql = `SELECT vw."CodigoId" ||' '|| vw."Descripcion" AS "Descripcion",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 AND EXTRACT(MONTH FROM v."Fecha") = 1 ) AS "Ene",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 AND EXTRACT(MONTH FROM v."Fecha") = 2 ) AS "Feb",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 AND EXTRACT(MONTH FROM v."Fecha") = 3 ) AS "Mar",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 AND EXTRACT(MONTH FROM v."Fecha") = 4 ) AS "Abr",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 AND EXTRACT(MONTH FROM v."Fecha") = 5 ) AS "May",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 AND EXTRACT(MONTH FROM v."Fecha") = 6 ) AS "Jun",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 AND EXTRACT(MONTH FROM v."Fecha") = 7 ) AS "Jul",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 AND EXTRACT(MONTH FROM v."Fecha") = 8 ) AS "Ago",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 AND EXTRACT(MONTH FROM v."Fecha") = 9 ) AS "Sep",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 AND EXTRACT(MONTH FROM v."Fecha") = 10 ) AS "Oct",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 AND EXTRACT(MONTH FROM v."Fecha") = 11 ) AS "Nov",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 AND EXTRACT(MONTH FROM v."Fecha") = 12 ) AS "Dic",
+		(SELECT COALESCE(SUM(v."UnidadesVendidas"),0) FROM ventas v WHERE v."SucursalId" BETWEEN $1 AND $2 AND v."CodigoId" = vw."CodigoId"
+				AND EXTRACT(YEAR FROM v."Fecha") = $3 ) AS "Total"
+		FROM vw_productos_descripcion vw
+		WHERE vw."CodigoId" IN (63,64,65)
+		ORDER BY "Descripcion"
 		`
 		try{
 			const response = await pool.query(sql,values)
