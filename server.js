@@ -3524,6 +3524,23 @@ app.get('/api/estadoderesultadoslimpiaduria/:Periodo',authenticationToken,async(
 		0 AS "Total"
 		UNION ALL
 		SELECT
+		'OTROS INGRESOS EMPRESA' AS "Concepto",
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 101
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 11
+		AND "CuentaContableId" = 1002
+		AND "SubcuentaContableId" = '001'
+		),
+		0 AS "Suc02",
+		0 AS "Suc03",
+		0 AS "Suc04",
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT
 		'OTROS GASTOS EMPRESA' AS "Concepto",
 		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
 		FROM registro_contable rc
