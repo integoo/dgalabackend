@@ -3317,32 +3317,6 @@ app.get('/api/estadoderesultadoslimpiaduria/:Periodo',authenticationToken,async(
 		0 AS "Total"
 		UNION ALL
 		SELECT
-		'Gastos Planta Matriz' AS "Concepto",
-		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
-		FROM registro_contable rc
-		WHERE "SucursalId" = 100
-		AND "Fecha" BETWEEN $1 AND $2
-		AND "UnidadDeNegocioId" = 10
-		AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)
-		),
-		0 AS "Suc02",
-		0 AS "Suc03",
-		0 AS "Suc04",
-		0 AS "Suc05",
-		0 AS "Suc06",
-		0 AS "Total"
-		UNION ALL
-		SELECT 
-		'** UTILIDAD BRUTA' AS "Concepto",
-		0 AS "Suc01",
-		0 AS "Suc02",
-		0 AS "Suc03",
-		0 AS "Suc04",
-		0 AS "Suc05",
-		0 AS "Suc06",
-		0 AS "Total"
-		UNION ALL
-		SELECT
 		'Gastos Sucursal' AS "Concepto",
 		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
 		FROM registro_contable rc
@@ -3372,6 +3346,32 @@ app.get('/api/estadoderesultadoslimpiaduria/:Periodo',authenticationToken,async(
 		AND "UnidadDeNegocioId" = 1
 		AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)
 		),
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT 
+		'** UTILIDAD BRUTA' AS "Concepto",
+		0 AS "Suc01",
+		0 AS "Suc02",
+		0 AS "Suc03",
+		0 AS "Suc04",
+		0 AS "Suc05",
+		0 AS "Suc06",
+		0 AS "Total"
+		UNION ALL
+		SELECT
+		'Gastos Planta Matriz' AS "Concepto",
+		(SELECT COALESCE(SUM("Monto"),0) AS "Suc01"
+		FROM registro_contable rc
+		WHERE "SucursalId" = 100
+		AND "Fecha" BETWEEN $1 AND $2
+		AND "UnidadDeNegocioId" = 10
+		AND "CuentaContableId" IN (SELECT "CuentaContableId" FROM cuentas_contables WHERE "NaturalezaCC" = -1)
+		),
+		0 AS "Suc02",
+		0 AS "Suc03",
+		0 AS "Suc04",
 		0 AS "Suc05",
 		0 AS "Suc06",
 		0 AS "Total"
