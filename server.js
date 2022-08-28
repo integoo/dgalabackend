@@ -520,6 +520,12 @@ app.get('/api/catalogos/:id',authenticationToken,async (req,res) => {
 	if (id === '10'){
 		sql = `SELECT "SucursalId","Sucursal" FROM sucursales WHERE "Status" = 'A' AND "TipoSucursal" IN ('S','C') ORDER BY "SucursalId"`
 	}
+	if (id === '10fisicasycedis'){
+		sql = `
+                       SELECT "SucursalId","Sucursal" 
+                       FROM sucursales WHERE "Status" = 'A' AND "TipoSucursal" IN ('S','C')
+                       AND "SucursalId" != 4 ORDER BY "SucursalId"`
+	}
 	if (id === '10todasyfisicas'){
 		sql = `
                        SELECT '00' AS "SucursalId",'00 TODAS' AS "Sucursal"
