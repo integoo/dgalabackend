@@ -4483,6 +4483,109 @@ app.get('/api/lavadassecadasservicios/:SucursalId/:year',authenticationToken,asy
 		}
 })
 
+app.get('/api/egresoslimpiaduriacuentacontable/:year/:consulta',authenticationToken,async(req, res) =>{
+	const fechaInicial= `01/01/${req.params.year}`
+	const fechaFinal= `12/31/${req.params.year}`
+	const consulta = req.params.consulta
+	const values = [fechaInicial,fechaFinal]
+	let sql=``
+	if (consulta === 'cuenta'){
+	sql = `
+			SELECT cc."CuentaContableId",cc."CuentaContable",EXTRACT(MONTH FROM rc."Fecha") AS "Mes", ROUND(SUM("Monto")) AS "Monto"
+			FROM registro_contable rc
+			INNER JOIN cuentas_contables cc ON cc."CuentaContableId" = rc."CuentaContableId"
+			WHERE "Fecha" between $1 and $2
+			AND "UnidadDeNegocioId" IN (1,2,10,11)
+			AND cc."NaturalezaCC" = -1
+			AND cc."CuentaContableId" != 13000 
+			GROUP BY cc."CuentaContableId",cc."CuentaContable","Mes"
+			ORDER BY cc."CuentaContableId",cc."CuentaContable"
+			`
+	}
+	if (consulta === 'subcuenta'){
+	sql = `
+			SELECT cc."CuentaContableId",cc."CuentaContable",scc."SubcuentaContableId",scc."SubcuentaContable",
+			EXTRACT(MONTH FROM rc."Fecha") AS "Mes", ROUND(SUM("Monto")) AS "Monto"
+			FROM registro_contable rc
+			INNER JOIN cuentas_contables cc ON cc."CuentaContableId" = rc."CuentaContableId"
+			INNER JOIN subcuentas_contables scc ON scc."CuentaContableId" = rc."CuentaContableId" AND scc."SubcuentaContableId" = rc."SubcuentaContableId"
+			WHERE "Fecha" between $1 and $2
+			AND "UnidadDeNegocioId" IN (1,2,10,11)
+			AND cc."NaturalezaCC" = -1
+			AND cc."CuentaContableId" != 13000 
+			GROUP BY cc."CuentaContableId",cc."CuentaContable",scc."SubcuentaContableId",scc."SubcuentaContable","Mes"
+			ORDER BY cc."CuentaContableId",scc."SubcuentaContableId"
+			`
+	}
+
+
+
+
+	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/egresoslimpiaduriacuentacontablesubcuentacontablemes/:year/:mes/:CuentaContableId/:SubcuentaContableId/:TipoConsulta',authenticationToken,async(req, res) =>{
+	const year = req.params.year
+	const mes = req.params.mes
+	const CuentaContableId = req.params.CuentaContableId
+	const SubcuentaContableId = req.params.SubcuentaContableId
+	const TipoConsulta = req.params.TipoConsulta
+
+
+	let values = []
+	let sql=``
+	if (TipoConsulta === 'cuenta'){
+		values = [year,mes,CuentaContableId]
+		sql = `
+			SELECT cc."CuentaContableId",cc."CuentaContable",scc."SubcuentaContableId",scc."SubcuentaContable",
+			"Monto",rc."Comentarios"
+			FROM registro_contable rc
+			INNER JOIN cuentas_contables cc ON cc."CuentaContableId" = rc."CuentaContableId"
+			INNER JOIN subcuentas_contables scc ON scc."CuentaContableId" = rc."CuentaContableId" AND scc."SubcuentaContableId" = rc."SubcuentaContableId"
+			WHERE EXTRACT(YEAR FROM "Fecha") = $1 
+			AND EXTRACT(MONTH FROM "Fecha") = $2
+			AND cc."CuentaContableId" = $3
+			AND "UnidadDeNegocioId" IN (1,2,10,11)
+			AND cc."NaturalezaCC" = -1
+			AND cc."CuentaContableId" != 13000 
+			ORDER BY cc."CuentaContableId",scc."SubcuentaContableId"
+			`
+	}
+	if (TipoConsulta === 'subcuenta'){
+		values = [year,mes,CuentaContableId,SubcuentaContableId]
+		sql = `
+			SELECT cc."CuentaContableId",cc."CuentaContable",scc."SubcuentaContableId",scc."SubcuentaContable",
+			"Monto",rc."Comentarios"
+			FROM registro_contable rc
+			INNER JOIN cuentas_contables cc ON cc."CuentaContableId" = rc."CuentaContableId"
+			INNER JOIN subcuentas_contables scc ON scc."CuentaContableId" = rc."CuentaContableId" AND scc."SubcuentaContableId" = rc."SubcuentaContableId"
+			WHERE EXTRACT(YEAR FROM "Fecha") = $1 
+			AND EXTRACT(MONTH FROM "Fecha") = $2
+			AND cc."CuentaContableId" = $3
+			AND scc."SubcuentaContableId" = $4
+			AND "UnidadDeNegocioId" IN (1,2,10,11)
+			AND cc."NaturalezaCC" = -1
+			AND cc."CuentaContableId" != 13000 
+			ORDER BY cc."CuentaContableId",scc."SubcuentaContableId"
+			`
+	}
+
+	try{
+		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
 
 function authenticationToken(req, res, next) {
     const authHeader = req.headers['authorization']
