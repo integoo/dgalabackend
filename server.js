@@ -10,6 +10,7 @@ const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken') 
 const bodyparser = require('body-parser')
 const cors = require('cors')
+const { restart } = require('nodemon')
 
 const pool = new Pool({
 	user: process.env.DB_USER,
@@ -4579,6 +4580,72 @@ app.get('/api/egresoslimpiaduriacuentacontablesubcuentacontablemes/:year/:mes/:C
 
 	try{
 		const response = await pool.query(sql,values)
+		const data = response.rows
+		res.status(200).json(data)
+	}catch(error){
+		console.log(error.message)
+		res.status(500).json({"error": error.message})
+	}
+})
+
+app.get('/api/productosmasdesplazadosmargen/:FechaInicial/:FechaFinal/:SucursalId',authenticationToken,async(req, res)=>{
+	const fechaInicial = req.params.FechaInicial
+	const fechaFinal = req.params.FechaFinal
+	const SucursalId = req.params.SucursalId
+
+	let values = [fechaInicial,fechaFinal,SucursalId]
+	let sql = `SELECT vw."CodigoId",CAST(vw."Descripcion" AS VARCHAR(80)),
+				SUM(v."UnidadesVendidas") AS "UnidadesVendidas",SUM(v."UnidadesVendidas"*v."PrecioVentaConImpuesto") AS "ExtVtaCImp",
+				ip."PrecioVentaConImpuesto",
+				CAST(ip."MargenReal" AS DEC(5,2)) AS "MargenActual",
+				
+				(SELECT CAST (MIN((1-("CostoPromedio"/"PrecioVentaSinImpuesto"))*100) AS DEC(5,2)) FROM ventas v
+				WHERE v."CodigoId" = vw."CodigoId" AND v."Status" = 'V' `
+				if(SucursalId != 0){
+					sql+=`AND v."SucursalId" = $3 `
+				}
+				sql+=`AND EXTRACT(YEAR FROM v."Fecha") = EXTRACT(YEAR FROM CURRENT_DATE)) AS "MargenMinAño",
+				
+				(SELECT CAST (MAX((1-("CostoPromedio"/"PrecioVentaSinImpuesto"))*100) AS DEC(5,2)) FROM ventas v
+				WHERE v."CodigoId" = vw."CodigoId" AND v."Status" = 'V' `
+				if(SucursalId != 0){
+					sql+=`AND v."SucursalId" = $3 `
+				}
+				sql+=`AND EXTRACT(YEAR FROM v."Fecha") = EXTRACT(YEAR FROM CURRENT_DATE)) AS "MargenMaxAño",
+				
+				(SELECT CAST (AVG((1-("CostoPromedio"/"PrecioVentaSinImpuesto"))*100) AS DEC(5,2)) FROM ventas v
+				WHERE v."CodigoId" = vw."CodigoId" AND v."Status" = 'V' `
+				if(SucursalId != 0){
+					sql+=`AND v."SucursalId" = $3 `
+				}
+				sql+=`AND EXTRACT(YEAR FROM v."Fecha") = EXTRACT(YEAR FROM CURRENT_DATE)) AS "MargenAño",
+
+				(SELECT CAST (AVG((1-("CostoPromedio"/"PrecioVentaSinImpuesto"))*100) AS DEC(5,2)) FROM ventas v
+				WHERE v."CodigoId" = vw."CodigoId" AND v."Status" = 'V' `
+				if(SucursalId != 0){
+					sql+=`AND v."SucursalId" = $3 `
+				}
+				sql+=`AND EXTRACT(YEAR FROM v."Fecha") = EXTRACT(YEAR FROM CURRENT_DATE)-1) AS "MargenAñoAnterior"
+
+				FROM vw_productos_descripcion vw
+				INNER JOIN ventas v ON v."CodigoId" = vw."CodigoId" AND v."Fecha" BETWEEN $1 AND $2 AND v."Status" = 'V' ` 
+				if(SucursalId != 0 ){
+					sql+=`AND v."SucursalId" = $3 `
+				}
+				sql+=`INNER JOIN inventario_perpetuo ip ON ip."CodigoId" = vw."CodigoId" `
+				
+				if(SucursalId != 0){
+					sql+=`AND ip."SucursalId" = $3 `  
+				}else{
+					sql+=`AND ip."SucursalId" = 3 `
+				}
+				
+				sql +=`AND $3 = $3
+				GROUP BY vw."CodigoId",vw."Descripcion",ip."PrecioVentaConImpuesto",ip."MargenReal"
+				ORDER BY "UnidadesVendidas" DESC
+				`
+	try{
+		const response = await pool.query(sql, values)
 		const data = response.rows
 		res.status(200).json(data)
 	}catch(error){
