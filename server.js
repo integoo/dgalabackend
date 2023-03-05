@@ -535,6 +535,12 @@ app.get('/api/catalogos/:id',authenticationToken,async (req,res) => {
                        FROM sucursales WHERE "Status" = 'A' AND "TipoSucursal" IN ('S')
                        AND "SucursalId" != 4 ORDER BY "SucursalId"`
 	}
+	if (id === '10fisicas'){
+		sql = `
+                       SELECT "SucursalId","Sucursal" 
+                       FROM sucursales WHERE "Status" = 'A' AND "TipoSucursal" IN ('S')
+                       AND "SucursalId" != 4 ORDER BY "SucursalId"`
+	}
 	if (id === '11'){
 		sql = `SELECT "ProveedorId","Proveedor","IVA" FROM proveedores WHERE "Status" = 'A' ORDER BY "ProveedorId"`
 	}
@@ -932,7 +938,7 @@ app.post('/api/grabarecepcionordencompra',authenticationToken, async(req, res)=>
 
 function sqlventasinsert(){
 
-	const sql = `INSERT INTO public.ventas ("SucursalId", "FolioId", "CodigoId", "SerialId", "Fecha", "FolioCompuesto", "Status", "ClienteId","CajeroId","VendedorId","CodigoBarras", "CategoriaId", "SubcategoriaId","FolioIdInventario","UnidadesRegistradas", "UnidadesVendidas", "UnidadesInventarioAntes", "UnidadesInventarioDespues", "CostoCompra", "CostoPromedio", "PrecioVentaSinImpuesto", "IVAId", "IVA", "IVAMonto", "IEPS", "IEPSMonto", "PrecioVentaConImpuesto", "UnidadesDevueltas","FechaDevolucionVenta","ComisionVentaPorcentaje","ComisionVenta","FechaHoraAlta","FechaHora","Usuario","CostoDeVentas","CostoDeVentasProcesado") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,$23, $24, $25, $26, $27, $28, $29, $30, $31, CLOCK_TIMESTAMP(), CLOCK_TIMESTAMP(),$32,$33,$34) RETURNING "FolioId"`
+	const sql = `INSERT INTO public.ventas ("SucursalId", "FolioId", "CodigoId", "SerialId", "Fecha", "FolioCompuesto", "Status", "ClienteId","CajeroId","VendedorId","CodigoBarras", "CategoriaId", "SubcategoriaId","FolioIdInventario","UnidadesRegistradas", "UnidadesVendidas", "UnidadesInventarioAntes", "UnidadesInventarioDespues", "CostoCompra", "CostoPromedio", "PrecioVentaSinImpuesto", "IVAId", "IVA", "IVAMonto", "IEPS", "IEPSMonto", "PrecioVentaConImpuesto", "UnidadesDevueltas","FechaDevolucionVenta","ComisionVentaPorcentaje","ComisionVenta","FechaHoraAlta","FechaHora","Usuario","CostoPromedioOriginal","CostoPromedioProcesado") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,$23, $24, $25, $26, $27, $28, $29, $30, $31, CLOCK_TIMESTAMP(), CLOCK_TIMESTAMP(),$32,$33,$34) RETURNING "FolioId"`
 
 	return sql
 
@@ -3951,7 +3957,7 @@ app.get('/api/ventas/bi/lavamatica/:year',authenticationToken,async(req,res) =>{
 					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 3  AND EXTRACT(YEAR FROM v."Fecha") = $1
 			GROUP BY "Numero","Transaccion","Mes"
 			UNION ALL
-			SELECT 4 AS "Numero",'CostoDeVentas' AS "Transaccion","Mes",
+			SELECT 4 AS "Numero",'CostoPromedio' AS "Transaccion","Mes",
 			COALESCE(SUM("UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
 			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
 					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 3  AND EXTRACT(YEAR FROM v."Fecha") = $1
@@ -4052,7 +4058,7 @@ app.get('/api/ventas/bi/tienda/:year',authenticationToken,async(req,res) =>{
 					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" NOT IN (1,3)  AND EXTRACT(YEAR FROM v."Fecha") = $1
 			GROUP BY "Numero","Transaccion","Mes"
 			UNION ALL
-			SELECT 4 AS "Numero",'CostoDeVentas' AS "Transaccion","Mes",
+			SELECT 4 AS "Numero",'CostoPromedio' AS "Transaccion","Mes",
 			COALESCE(SUM("UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
 			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
 					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" NOT IN (1,3) AND EXTRACT(YEAR FROM v."Fecha") = $1
@@ -4127,7 +4133,7 @@ app.get('/api/ventas/bi/decorafiestas/:year',authenticationToken,async(req,res) 
 					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 1  AND EXTRACT(YEAR FROM v."Fecha") = $1
 			GROUP BY "Numero","Transaccion","Mes"
 			UNION ALL
-			SELECT 4 AS "Numero",'CostoDeVentas' AS "Transaccion","Mes",
+			SELECT 4 AS "Numero",'CostoPromedio' AS "Transaccion","Mes",
 			COALESCE(SUM("UnidadesVendidas"*"CostoPromedio"),0) AS "Monto"
 			FROM (SELECT DISTINCT "Mes" FROM dim_catalogo_tiempo) AS m
 					LEFT JOIN ventas v ON m."Mes" = EXTRACT(MONTH FROM v."Fecha") AND v."CategoriaId" = 1 AND EXTRACT(YEAR FROM v."Fecha") = $1
@@ -4399,7 +4405,7 @@ app.get('/api/inventariofaltantes/:SucursalId',authenticationToken,async(req, re
 	const sql = `
 		SELECT ip."SucursalId",
 		vw."CodigoId",
-		CAST(vw."Descripcion" AS VARCHAR(70)),
+		vw."Descripcion",
 		ip."Maximo",
 		ip."Minimo",
 		ip."UnidadesInventario" AS "UniInv",
