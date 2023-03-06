@@ -3055,7 +3055,9 @@ app.post('/api/cambiosdepresentacionajustes',authenticationToken,async(req,res) 
 		PrecioVentaSinImpuesto = parseFloat(response.rows[0].PrecioVentaSinImpuesto)
 		PrecioVentaConImpuesto = parseFloat(response.rows[0].PrecioVentaConImpuesto)
 
-		values = [SucursalId,parseInt(CodigoIdPadre),FolioId,CodigoBarrasPadre,CategoriaId,SubcategoriaId,TipoAjusteId,AfectaCosto,parseInt(UnidadesConvertir),UnidadesInventario,UnidadesInventarioDespues,CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,parseInt(ColaboradorId),Usuario]
+		const vunidadesajustadasnegativas = parseInt(UnidadesConvertir) * -1
+
+		values = [SucursalId,parseInt(CodigoIdPadre),FolioId,CodigoBarrasPadre,CategoriaId,SubcategoriaId,TipoAjusteId,AfectaCosto,vunidadesajustadasnegativas,UnidadesInventario,UnidadesInventarioDespues,CostoCompra,CostoPromedio,PrecioVentaSinImpuesto,PrecioVentaConImpuesto,parseInt(ColaboradorId),Usuario]
 
 		sql = `INSERT INTO ajustes_inventario("SucursalId","CodigoId","FolioId","CodigoBarras","Fecha","CategoriaId","SubcategoriaId","TipoAjusteId",
 			"AfectaCosto","UnidadesAjustadas","UnidadesInventarioAntes","UnidadesInventarioDespues","CostoCompra","CostoPromedio","PrecioVentaSinImpuesto",
