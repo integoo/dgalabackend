@@ -1207,7 +1207,7 @@ app.post('/api/agregaregistroventapendiente',authenticationToken,async(req, res)
 			0,
 			0,
 			Usuario,
-			0,
+			CostoPromedio,
 			'N']
 			
 
