@@ -75,7 +75,6 @@ app.post('/login',async (req, res)=>{
 		return res.status(401).json({"error": "Usuario No Existe"})
 	}	
 
-
 	if(await bcrypt.compare(password, hashPassword[0].Password)) {
 		//######################################################
 		//jwt
@@ -3768,6 +3767,8 @@ app.get('/api/consultamelateegresospormes/:anio',authenticationToken,async(req,r
 				GROUP BY "Mes"
 				ORDER BY 1 ;
 	`
+
+
 	try{
 		const response = await pool.query(sql,values)
 		const data = response.rows
