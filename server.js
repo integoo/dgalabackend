@@ -12,6 +12,30 @@ const bodyparser = require('body-parser')
 const cors = require('cors')
 const { restart } = require('nodemon')
 
+
+
+
+
+
+
+
+const fs = require('fs')
+const https = require('https')
+
+const options_https = {
+	key: fs.readFileSync('/home/ubuntu/produccion/dgalabackend/privkey1.pem'), //Ruta de la Clave o Lleve PRIVADA
+	cert: fs.readFileSync('/home/ubuntu/produccion/dgalabackend/fullchain1.pem') //Ruta del Certificado
+}
+
+
+
+
+
+
+
+
+
+
 const pool = new Pool({
 	user: process.env.DB_USER,
 	password: process.env.DB_PASSWORD,
@@ -4678,8 +4702,25 @@ function authenticationToken(req, res, next) {
 
 const port = parseInt(process.env.PORT)
 
+
+
+
+
+
+/*
 if (port === 3001){
 	app.listen(port, ()=>{console.log(`Server is running.... on Port ${port} PRODUCTION`)})
 }else{
 	app.listen(port, ()=>{console.log(`Server is running.... on Port ${port} DEVELOPMENT`)})
 }
+*/
+
+
+
+
+
+//Crear el Servidor HTTPS
+const httpsServer = https.createServer(options_https,app);
+httpsServer.listen(8443, ()=>{
+	console.log(`Server is running....... on Port ${port} PRODUCTION`)
+});
