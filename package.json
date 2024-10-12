@@ -28,7 +28,8 @@
     "jsonwebtoken": "^8.5.1",
     "npm": "^7.17.0",
     "pg": "^8.5.1",
-    "pm2": "^4.5.0"
+    "pm2": "^4.5.0",
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.6"
