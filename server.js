@@ -17,7 +17,8 @@ const { restart } = require('nodemon')
 
 
 
-
+/*
+//Estas líneas se usan para https mediante el uso de certificados
 
 const fs = require('fs')
 const https = require('https')
@@ -27,7 +28,7 @@ const options_https = {
 	cert: fs.readFileSync('/home/ubuntu/produccion/dgalabackend/fullchain1.pem') //Ruta del Certificado
 }
 
-
+*/
 
 
 
@@ -55,16 +56,27 @@ app.use(bodyparser.urlencoded({
 app.use(cors())
 app.options('*',cors())
 
+/*
+//EU ********************************************************
+const corsOptions = {
+        origin: '*',  // Permitir todos los orígenes
+        methods: '*',  // Permitir todos los métodos HTTP
+        allowedHeaders: '*',  // Permitir todos los headers
+  };
 
+  app.use(cors(corsOptions));
+
+//EU ********************************************************
+*/
 
 
 //routes
-app.get('/HelloWorld', (req,res)=>{
+app.get('/api/HelloWorld', (req,res)=>{
 	res.send('Hello World AWS Testing Server!!!')
 })
 
 
-app.post('/login',async (req, res)=>{
+app.post('/api/login',async (req, res)=>{
 	const user = req.body.user
 	const password = req.body.password
 
@@ -155,7 +167,7 @@ app.get('/api/fechaactual',authenticationToken,async(req,res) =>{
 	}
 })
 
-app.get('/ingresos/unidadesdenegociocatalogo/:naturalezaCC',authenticationToken,async(req, res) => {
+app.get('/api/ingresos/unidadesdenegociocatalogo/:naturalezaCC',authenticationToken,async(req, res) => {
 	let naturalezaCC = req.params.naturalezaCC;
 
 	let sql = `SELECT DISTINCT cc."SucursalId", udn."UnidadDeNegocioId", udn."UnidadDeNegocio" 
@@ -178,7 +190,7 @@ app.get('/ingresos/unidadesdenegociocatalogo/:naturalezaCC',authenticationToken,
 	}
 })
 
-app.get('/ingresos/unidadesdenegocio/:sucursal',authenticationToken,async(req, res) => {
+app.get('/api/ingresos/unidadesdenegocio/:sucursal',authenticationToken,async(req, res) => {
 	const vsucursal = req.params.sucursal
 	let sql = `SELECT "UnidadDeNegocioId","UnidadDeNegocio" FROM unidades_de_negocio
 			WHERE "Status"= $1 AND "UnidadDeNegocioId" IN (SELECT "UnidadDeNegocioId" FROM catalogo_contable 
@@ -197,7 +209,7 @@ app.get('/ingresos/unidadesdenegocio/:sucursal',authenticationToken,async(req, r
 	
 })
 
-app.get('/ingresos/cuentascontablescatalogo/:naturalezaCC',authenticationToken, async(req, res) => {
+app.get('/api/ingresos/cuentascontablescatalogo/:naturalezaCC',authenticationToken, async(req, res) => {
 	let naturalezaCC = req.params.naturalezaCC;
 
 
@@ -220,7 +232,7 @@ app.get('/ingresos/cuentascontablescatalogo/:naturalezaCC',authenticationToken, 
 	}
 })
 
-app.get('/ingresos/cuentascontables/:sucursal/:unidaddenegocio',authenticationToken, async(req, res) => {
+app.get('/api/ingresos/cuentascontables/:sucursal/:unidaddenegocio',authenticationToken, async(req, res) => {
 	const vsucursal = req.params.sucursal
 	const vunidaddenegocio = req.params.unidaddenegocio
 
@@ -241,7 +253,7 @@ app.get('/ingresos/cuentascontables/:sucursal/:unidaddenegocio',authenticationTo
 	}
 })
 
-app.get('/ingresos/subcuentascontablescatalogo/:naturalezaCC',authenticationToken, async(req,res) => {
+app.get('/api/ingresos/subcuentascontablescatalogo/:naturalezaCC',authenticationToken, async(req,res) => {
 	const naturalezaCC = req.params.naturalezaCC;
 
 	let sql = `SELECT DISTINCT cc."SucursalId",cc."UnidadDeNegocioId",scc."CuentaContableId", scc."SubcuentaContableId", scc."SubcuentaContable"
@@ -266,7 +278,7 @@ app.get('/ingresos/subcuentascontablescatalogo/:naturalezaCC',authenticationToke
 })
 
 
-app.get('/ingresos/subcuentascontables/:sucursal/:unidaddenegocio/:cuentacontable',authenticationToken, async(req, res) => {
+app.get('/api/ingresos/subcuentascontables/:sucursal/:unidaddenegocio/:cuentacontable',authenticationToken, async(req, res) => {
 	const vsucursal = req.params.sucursal
 	const vunidaddenegocio = req.params.unidaddenegocio
 	const vcuentacontable = req.params.cuentacontable
@@ -286,7 +298,7 @@ app.get('/ingresos/subcuentascontables/:sucursal/:unidaddenegocio/:cuentacontabl
 	}
 })
 
-app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
+app.post('/api/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 
 	const vsucursalid = req.body.SucursalId
         const vunidaddenegocioid = req.body.UnidadDeNegocioId
@@ -345,7 +357,7 @@ app.post('/ingresos/grabaingresos',authenticationToken, async(req, res) => {
 	
 })
 
-app.post('/ingresos/grabaingresos2',authenticationToken, async(req, res) => {
+app.post('/api/ingresos/grabaingresos2',authenticationToken, async(req, res) => {
 	const arreglo = req.body
 	let values = []
 	const client = await pool.connect();
@@ -403,7 +415,7 @@ app.post('/ingresos/grabaingresos2',authenticationToken, async(req, res) => {
 
 
 
-app.get('/ingresos/getIngresosEgresos/:fecha/:naturalezaCC/:accesoDB/:trans',authenticationToken,async(req, res)=> {
+app.get('/api/ingresos/getIngresosEgresos/:fecha/:naturalezaCC/:accesoDB/:trans',authenticationToken,async(req, res)=> {
 	const vfecha = req.params.fecha
 	const naturalezaCC = req.params.naturalezaCC
 	const accesoDB = req.params.accesoDB
@@ -424,13 +436,13 @@ app.get('/ingresos/getIngresosEgresos/:fecha/:naturalezaCC/:accesoDB/:trans',aut
 	if (accesoDB === 'mes'){
 		sql+=`WHERE dct."PrimerDiaMes"<= $1 AND dct."UltimoDiaMes">= $1 `
 	}else{
-		sql+=`WHERE rc."Fecha" = $1`
+		sql+=`WHERE rc."Fecha" = $1 `
 	}
 
 	if(naturalezaCC > 0){
-		sql+=`AND rc."Monto" >= 0 AND cc."NaturalezaCC" = 1`
+		sql+=`AND rc."Monto" >= 0 AND cc."NaturalezaCC" = 1 `
 	}else{
-		sql+=`AND rc."Monto" <= 0 AND cc."NaturalezaCC" = -1`
+		sql+=`AND rc."Monto" <= 0 AND cc."NaturalezaCC" = -1 `
 	}
 	if (trans === "Ingresos"){
 		sql+=`ORDER BY rc."Fecha" DESC,rc."SucursalId",rc."FolioId" DESC,udn."UnidadDeNegocioId",cc."CuentaContableId",scc."SubcuentaContableId"`
@@ -493,7 +505,7 @@ app.put('/api/actualizaingresosegresos',authenticationToken,async(req, res) =>{
 	}
 })
 
-app.get('/periodoabierto',authenticationToken,async (req, res) => {
+app.get('/api/periodoabierto',authenticationToken,async (req, res) => {
 	let sql = `SELECT cm."Periodo",cm."PrimerDiaMes",CAST(ct."UltimoDiaMes" AS CHAR(10)) 
 			FROM cierres_mes cm
 			INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = cm."PrimerDiaMes"
@@ -3921,8 +3933,6 @@ app.get('/api/gastosinversionesporanio/:year',authenticationToken,async (req,res
 		WHERE cc."CuentaContableId" >= 2000
 		ORDER BY cc."CuentaContableId",scc."SubcuentaContable"
 		`
-	//664 634-00-77 Nucleo Radiológico Zona Rio.
-	//664 971-09-41 Imagen Integral.
 
 		const response = await pool.query(sql,values)
 		const data = response.rows
@@ -4707,20 +4717,20 @@ const port = parseInt(process.env.PORT)
 
 
 
-/*
 if (port === 3001){
 	app.listen(port, ()=>{console.log(`Server is running.... on Port ${port} PRODUCTION`)})
 }else{
 	app.listen(port, ()=>{console.log(`Server is running.... on Port ${port} DEVELOPMENT`)})
 }
-*/
 
 
 
-
+/*
+//Estas líneas se usan para https mediante el uso de certificados
 
 //Crear el Servidor HTTPS
 const httpsServer = https.createServer(options_https,app);
 httpsServer.listen(8443, ()=>{
 	console.log(`Server is running....... on Port ${port} PRODUCTION`)
 });
+*/
