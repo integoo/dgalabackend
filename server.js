@@ -507,15 +507,15 @@ app.put('/api/actualizaingresosegresos',authenticationToken,async(req, res) =>{
 
 app.get('/api/periodoabierto',authenticationToken,async (req, res) => {
 	let sql = `SELECT cm."Periodo",cm."PrimerDiaMes",CAST(ct."UltimoDiaMes" AS CHAR(10)) 
-			FROM cierres_mes cm
-			INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = cm."PrimerDiaMes"
-			WHERE cm."Status" = 'A'
+			FROM cierres_mes cm 
+			INNER JOIN dim_catalogo_tiempo ct ON ct."Fecha" = cm."PrimerDiaMes" 
+			WHERE cm."Status" = 'A' 
 	`
 	let response;
 	const values=[]
 	try{
 		const data = await pool.query(sql, values)
-		res.status(200).json(data)
+		res.status(200).json(data.rows)
 	}catch(error){
 		console.log(error.message)
 		res.status(500).json({"error": error.message})
