@@ -1,0 +1,13 @@
+Para actualizar server.js
+
+sudo pm2 server o id 0
+
+sudo pm2 list
+
+git pull origin main
+
+npm install
+
+sudo pm2 restart server o id 0
+
+sudo pm2 logs server o id 0
