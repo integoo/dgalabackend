@@ -81,53 +81,59 @@ app.post('/api/login',async (req, res)=>{
 	const password = req.body.password
 
 	if (user === null || user === ''){
-		//return res.status(401).send("Usuario No es Válido")
 		return res.status(401).json({"error":"Usuario No es Válido"})
 	}
 	if (password === null || password === ''){
-		//return res.status(401).send("Password No es Válido")
 		return res.status(401).json({"error":"Password No es Válido"})
 	}
 
 
-	let response;
-	let hashPassword;
+	let response="";
+	let hashPassword="";
 	let values = [user]
 	let sql = `SELECT "Password","ColaboradorId","SucursalId",'`+process.env.DB_DATABASE+`' AS db_name,"Administrador","PerfilTransacciones"
 			FROM colaboradores 
-			WHERE "User" = $1 UNION ALL SELECT '0','0','0','0','0','0'`
+			WHERE "User" = $1 
+			UNION ALL 
+			SELECT '0','0','0','0','0','0'
+			WHERE NOT EXISTS (
+				SELECT 1
+				FROM colaboradores
+				WHERE "User" = $1)`
 	try{
 		response = await pool.query(sql, values)
 	  	hashPassword = response.rows
 	}catch(error){
 		console.log(error.message)
-		//return res.status(500).send(error.message)
 		return res.status(500).json({"error": error.message})
 	}
 
 
 	if (hashPassword[0].Password === '0') {
-		//return res.status(401).send("Usuario No Existe")
 		return res.status(401).json({"error": "Usuario No Existe"})
 	}	
 
 	if(await bcrypt.compare(password, hashPassword[0].Password)) {
 		//######################################################
 		//jwt
-		const jsonUser = { name: user }
-		const accessToken = jwt.sign(jsonUser, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '12h' })
+
+		const accessToken = jwt.sign({ name: user }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '12h' })
+
 		//######################################################
 
 
-		//res.send('User :'+ user + ' Password : '+ password + ' hashPassword : '+ hashPassword[0].Password)
-		//res.status(200).json({ "user": user, "accessToken": accessToken})
-		res.status(200).json({ "error":'', "user": user, "accessToken": accessToken, "ColaboradorId": hashPassword[0].ColaboradorId, "SucursalId": hashPassword[0].SucursalId,"db_name": hashPassword[0].db_name,"Administrador":hashPassword[0].Administrador,"PerfilTransacciones":hashPassword[0].PerfilTransacciones})
+		res.status(200).json({ "error":'',
+					"accessToken": accessToken,
+					"ColaboradorId": hashPassword[0].ColaboradorId,
+					"SucursalId": hashPassword[0].SucursalId,
+					"db_name": hashPassword[0].db_name,
+					"Administrador":hashPassword[0].Administrador,
+					"PerfilTransacciones":hashPassword[0].PerfilTransacciones})
 	}else{
-		//res.status(401).send("Password Incorrecto") 
 		res.status(401).json({"error":"Password Incorrecto"}) 
 	}
-
 })
+
 
 app.get('/api/sucursales/:naturalezaCC',authenticationToken,async(req, res) => {
 	let naturalezaCC = req.params.naturalezaCC;
