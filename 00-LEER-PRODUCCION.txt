@@ -1,3 +1,14 @@
+Para ejecutar el server.js
+
+Ambiente Development:
+npm run devStart
+
+Ambiente Production
+npm run prdStart
+
+Automated Testing
+npm run test
+
 Para actualizar server.js
 
 sudo pm2 server o id 0
