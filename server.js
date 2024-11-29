@@ -595,8 +595,8 @@ app.get('/api/catalogos/:id', authenticationToken, async (req, res) => {
 	}
 
 	try {
-		const response = await pool.query(sql)
-		res.status(200).json(response.rows)
+		const { rows } = await pool.query(sql)
+		res.status(200).json(rows)
 
 	} catch (error) {
 		console.error(error.message)
@@ -1392,9 +1392,8 @@ app.get('/api/consultaProductosRecientes', authenticationToken, async (req, res)
 	let sql = `SELECT "CodigoId","CodigoBarras","Descripcion" FROM vw_productos_descripcion ORDER BY "CodigoId" DESC LIMIT 10`
 
 	try {
-		const response = await pool.query(sql)
-		const data = response.rows
-		res.status(200).json(data)
+		const { rows } = await pool.query(sql)
+		res.status(200).json(rows)
 	} catch (error) {
 		console.log(error.message)
 		res.status(500).json({ "error": error.message })
