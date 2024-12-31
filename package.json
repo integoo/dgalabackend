@@ -1,12 +1,12 @@
 {
   "name": "dgalabackend",
   "version": "1.0.0",
-  "description": "",
   "main": "server.js",
   "scripts": {
-    "prdStart": "nodemon server.js",
-    "devStart": "nodemon server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
+    "prdStart": "node server.js",
+    "devStart": "nodemon server.js"
   },
   "repository": {
     "type": "git",
@@ -15,23 +15,21 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/integoo/dgalabackend/issues"
   },
   "homepage": "https://github.com/integoo/dgalabackend#readme",
-  "dependencies": {
-    "bcrypt": "^5.0.0",
-    "body-parser": "^1.19.0",
-    "cors": "^2.8.5",
-    "dotenv": "^8.2.0",
-    "express": "^4.17.1",
-    "jsonwebtoken": "^8.5.1",
-    "npm": "^7.17.0",
-    "pg": "^8.5.1",
-    "pm2": "^4.5.0",
-    "uuid": "^10.0.0"
-  },
+  "description": "",
   "devDependencies": {
-    "nodemon": "^2.0.6"
+    "nodemon": "^3.1.9"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1"
   }
 }
