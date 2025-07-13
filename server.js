@@ -371,6 +371,8 @@ app.post('/api/ingresos/grabaingresos2', authenticationToken, async (req, res) =
 	const client = await pool.connect();
 	let sql = ''
 	let response;
+	let response2;
+	let banderaDuplicados = false
 	let Periodo;
 	try {
 		await client.query('BEGIN')
@@ -389,6 +391,34 @@ app.post('/api/ingresos/grabaingresos2', authenticationToken, async (req, res) =
 			const vusuario = arreglo[i].Usuario
 
 			values = [vsucursalid, vunidaddenegocioid, vcuentacontableid, vsubcuentacontableid, vcomentarios, vfecha, Periodo, vmonto, 'P', "now()", vusuario, 'now()']
+
+
+
+
+
+
+
+
+
+//eu******************************
+			sql=`SELECT COUNT(*) AS "CuentaRegistros" FROM registro_contable
+                      	WHERE "SucursalId" = $1 AND "UnidadDeNegocioId" = $2 AND "CuentaContableId"= $3 AND "SubcuentaContableId" = $4
+                      	AND $5 = $5 AND "Fecha" = $6 AND $7 = $7 AND "Monto" = $8 AND $9 = $9 AND $10 = $10 AND $11 = $11 AND $12 = $12`
+                	response2 = await client.query(sql,values)
+			if (response2.rows[0].CuentaRegistros > 0) {
+				banderaDuplicados = true
+			}
+//********************************
+
+
+
+
+
+
+
+
+
+
 			sql = `INSERT INTO registro_contable ("FolioId","SucursalId","UnidadDeNegocioId","CuentaContableId",
 			"SubcuentaContableId","Comentarios","Fecha","Periodo","Monto","Moneda",
 			"FechaHoraAlta","Usuario","FechaHora") VALUES (
@@ -410,8 +440,14 @@ app.post('/api/ingresos/grabaingresos2', authenticationToken, async (req, res) =
 			let response = await client.query(sql, values)
 			//console.log(response.rows[0].SucursalId,response.rows[0].FolioId)
 		}
-		await client.query('COMMIT')
-		res.status(200).json({ "message": "Success!!!" })
+		if (banderaDuplicados === false){
+			await client.query('COMMIT')
+			res.status(200).json({ "message": "Success!!!" })
+		}else{
+			await client.query('ROLLBACK')
+			res.status(409).json({ "error": "Registros Duplicados. No se registró la Transaccion!!!" })
+
+		}
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
