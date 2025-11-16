@@ -1252,7 +1252,8 @@ app.put('/api/eliminaregistroventapendiente', authenticationToken, async (req, r
 
 
 app.post('/api/agregaregistroventapendiente', authenticationToken, async (req, res) => {
-	const { SucursalId, FolioId, ClienteId, CajeroId, VendedorId, SerialId, CodigoId, CodigoBarras, UnidadesRegistradas, PrecioVentaConImpuesto, Usuario } = req.body
+	//const { SucursalId, FolioId, ClienteId, CajeroId, VendedorId, SerialId, CodigoId, CodigoBarras, UnidadesRegistradas, PrecioVentaConImpuesto, Usuario } = req.body
+	const { SucursalId, FolioId, ClienteId, CajeroId, VendedorId, CodigoId, CodigoBarras, UnidadesRegistradas, PrecioVentaConImpuesto, Usuario } = req.body
 
 	const client = await pool.connect()
 
