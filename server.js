@@ -1,8 +1,31 @@
 //Para generar .env ACCESS_TOKEN_SECRET=
 //node <enter>
 //require("crypto").randomBytes(64).toString("hex")
+/*
+Sentry.io
+Enviar y grabar error sin try/catch: 
+throw new Error("My first Sentry error!");
+Enviar y grabar error con try/catch: 
+Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
+
+// Para mensajes informativos o advertencias sin stack trace
+Sentry.captureMessage("El usuario intentó acceder a una ruta prohibida");
+*/
 
 require('dotenv').config()
+
+
+
+//Sentry
+const Sentry = require("@sentry/node");
+Sentry.init({
+  dsn: "https://fb6fae39ff494359a741f1cb64e5cb75@o4510927805022208.ingest.us.sentry.io/4510943095554048",
+  // Setting this option to true will send default PII data to Sentry.
+  // For example, automatic IP address collection on events
+  sendDefaultPii: true,
+});
+
+
 const express = require('express')
 const app = express()
 const { Client, Pool } = require('pg')
@@ -76,6 +99,13 @@ app.get('/api/HelloWorld', (req, res) => {
 })
 
 
+//Sentry
+app.get("/api/debug-sentry", function mainHandler(req, res) {
+  throw new Error("My first Sentry error!");
+});
+
+
+
 app.post('/api/login', async (req, res) => {
 	const user = req.body.user
 	const password = req.body.password
@@ -105,6 +135,7 @@ app.post('/api/login', async (req, res) => {
 		hashPassword = response.rows
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		return res.status(500).json({ "error": error.message })
 	}
 
@@ -156,6 +187,7 @@ app.get('/api/sucursales/:naturalezaCC', authenticationToken, async (req, res) =
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -171,6 +203,7 @@ app.get('/api/fechaactual', authenticationToken, async (req, res) => {
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -194,6 +227,7 @@ app.get('/api/ingresos/unidadesdenegociocatalogo/:naturalezaCC', authenticationT
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -212,6 +246,7 @@ app.get('/api/ingresos/unidadesdenegocio/:sucursal', authenticationToken, async 
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 
@@ -236,6 +271,7 @@ app.get('/api/ingresos/cuentascontablescatalogo/:naturalezaCC', authenticationTo
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -257,6 +293,7 @@ app.get('/api/ingresos/cuentascontables/:sucursal/:unidaddenegocio', authenticat
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -281,6 +318,7 @@ app.get('/api/ingresos/subcuentascontablescatalogo/:naturalezaCC', authenticatio
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -302,6 +340,7 @@ app.get('/api/ingresos/subcuentascontables/:sucursal/:unidaddenegocio/:cuentacon
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -357,6 +396,7 @@ app.post('/api/ingresos/grabaingresos', authenticationToken, async (req, res) =>
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		// res.status(400).send(error.message)
 		res.status(500).json({ "error": error.message })
 	} finally {
@@ -451,6 +491,7 @@ app.post('/api/ingresos/grabaingresos2', authenticationToken, async (req, res) =
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(400).send(error.message)
 	} finally {
 		client.release()
@@ -502,6 +543,7 @@ app.get('/api/ingresos/getIngresosEgresos/:fecha/:naturalezaCC/:accesoDB/:trans'
 
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -543,6 +585,7 @@ app.put('/api/actualizaingresosegresos', authenticationToken, async (req, res) =
 	} catch (error) {
 		console.log(error.message)
 		client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -562,6 +605,7 @@ app.get('/api/periodoabierto', authenticationToken, async (req, res) => {
 		res.status(200).json(data.rows)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -636,6 +680,7 @@ app.get('/api/catalogos/:id', authenticationToken, async (req, res) => {
 
 	} catch (error) {
 		console.error(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -663,6 +708,7 @@ app.get('/api/validamovimientoingresosegresos/:SucursalId/:UnidadDeNegocioId/:Cu
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -750,6 +796,7 @@ app.post('/api/altaProductos', authenticationToken, async (req, res) => {
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -1009,6 +1056,7 @@ app.post('/api/grabarecepcionordencompra', authenticationToken, async (req, res)
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -1203,6 +1251,7 @@ app.post('/api/grabaventas', authenticationToken, async (req, res) => {
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ error: error.message })
 	} finally {
 		client.release()
@@ -1244,6 +1293,7 @@ app.put('/api/eliminaregistroventapendiente', authenticationToken, async (req, r
 	} catch (error) {
 		console.error(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -1323,6 +1373,7 @@ app.post('/api/agregaregistroventapendiente', authenticationToken, async (req, r
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -1416,6 +1467,7 @@ app.put('/api/cierraventa', authenticationToken, async (req, res) => {
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ error: error.message })
 	} finally {
 		client.release()
@@ -1433,6 +1485,7 @@ app.get('/api/consultaProductosRecientes', authenticationToken, async (req, res)
 		res.status(200).json(rows)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 
 	}
@@ -1461,6 +1514,7 @@ app.get('/api/productodescripcion/:id', authenticationToken, async (req, res) =>
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1484,6 +1538,7 @@ app.get('/api/productosdatosventa/:SucursalId/:id', authenticationToken, async (
 		res.status(200).json(data)
 	} catch (error) {
 		console.error(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1511,6 +1566,7 @@ app.get('/api/productosdescripcion/:desc/:SucursalId', authenticationToken, asyn
 		res.status(200).json(data)
 	} catch (error) {
 		console.error(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1555,6 +1611,7 @@ app.get('/api/productodescripcionporcodigobarras/:SucursalId/:CodigoBarras/:Solo
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1597,6 +1654,7 @@ app.get('/api/productosdescripcioncompraventa/:SucursalId/:desc/:SoloInventariab
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1630,6 +1688,7 @@ app.get('/api/comprasconsulta/:SucursalId/:FechaIni/:FechaFin', authenticationTo
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1654,6 +1713,7 @@ app.get('/api/ventasconsulta/:SucursalId/:FechaIni/:FechaFin', authenticationTok
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 
 	}
@@ -1698,6 +1758,7 @@ app.get('/api/kardex/:SucursalId/:CodigoBarras/:FechaInicial/:FechaFinal', authe
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1750,6 +1811,7 @@ app.get('/api/inventarioperpetuo/:SucursalId/:CodigoBarras/:SoloConExistencia/:r
 
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1775,6 +1837,7 @@ app.get('/api/inventarioperpetuoproductoexistencia/:SucursalId/:CodigoBarras', a
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1797,6 +1860,7 @@ app.get('/api/ventasfolios/:SucursalId/:Fecha', authenticationToken, async (req,
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 
@@ -1818,6 +1882,7 @@ app.get('/api/ventasticket/:SucursalId/:FolioId', authenticationToken, async (re
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 
@@ -1842,6 +1907,7 @@ app.get('/api/ventasconsultafechaproducto/:SucursalId/:FechaInicial/:FechaFinal'
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1860,6 +1926,7 @@ app.get('/api/periodoabierto', authenticationToken, async (req, res) => {
 		}
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1875,6 +1942,7 @@ app.get('/api/colaboradoradministrador/:ColaboradorId', authenticationToken, asy
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1909,6 +1977,7 @@ app.get('/api/cierremescantidades/:Periodo', authenticationToken, async (req, re
 
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 
@@ -1924,6 +1993,7 @@ app.get('/api/fechahoy', authenticationToken, async (req, res) => {
 
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1955,6 +2025,7 @@ app.get('/api/consultaretiros/:Periodo', authenticationToken, async (req, res) =
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -1995,6 +2066,7 @@ app.post('/api/cargaretiros', authenticationToken, async (req, res) => {
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -2025,6 +2097,7 @@ app.post('/api/aceptaretiro', authenticationToken, async (req, res) => {
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -2053,6 +2126,7 @@ app.post('/api/cancelaretiro', authenticationToken, async (req, res) => {
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -2109,6 +2183,7 @@ app.post('/api/cierra-abre-mes-retiros', authenticationToken, async (req, res) =
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -2136,6 +2211,7 @@ app.get('/api/consultaventaspendientes/:SucursalId', authenticationToken, async 
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -2216,6 +2292,7 @@ app.get('/api/consultaventaspendientesarreglo/:SucursalId', authenticationToken,
 		res.status(200).json(arreglo)
 	} catch (error) {
 		console.error(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -2236,6 +2313,7 @@ app.get('/api/consultaventapendienteporfolio/:SucursalId/:NotaId', authenticatio
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -2268,6 +2346,7 @@ app.post('/api/cancelaventapendiente', authenticationToken, async (req, res) => 
 	} catch (error) {
 		console.error(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -2284,6 +2363,7 @@ app.get('/api/catalogoclientes', authenticationToken, async (req, res) => {
 		res.status(200).json(response.rows);
 	} catch (error) {
 		console.error(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -2299,6 +2379,7 @@ app.get('/api/consultatipoajustes', authenticationToken, async (req, res) => {
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -2320,6 +2401,7 @@ app.get('/api/consultaajustesinventariorecientes/:SucursalId', authenticationTok
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -2380,6 +2462,7 @@ app.post('/api/grabaajustesinventario', authenticationToken, async (req, res) =>
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -2408,6 +2491,7 @@ app.get('/api/consultaventascategorias/:SucursalId/:FechaInicial/:FechaFinal', a
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -2767,6 +2851,7 @@ app.post('/api/grabatraspasosalida', authenticationToken, async (req, res) => {
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -2786,6 +2871,7 @@ app.get('/api/codigobarrasprincipal/:CodigoId', authenticationToken, async (req,
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ error: error.message })
 	}
 
@@ -2846,6 +2932,7 @@ app.post('/api/inventariociclico', authenticationToken, async (req, res) => {
 	} catch (error) {
 		console.log(error.message)
 		await client.query('ROLLBACK')
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -2867,6 +2954,7 @@ app.get('/api/ventassucursaleshoy', authenticationToken, async (req, res) => {
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -2913,6 +3001,7 @@ app.get('/api/ventassucursalesperiodolavamatica/:FechaInicial/:FechaFinal/:DiasM
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -2961,6 +3050,7 @@ app.get('/api/ventassucursalesperiodounidaddenegocio/:FechaInicial/:FechaFinal/:
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -2979,6 +3069,7 @@ app.get('/api/consultaperiodos', authenticationToken, async (req, res) => {
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -2997,6 +3088,7 @@ app.get('/api/consultaperiodosregistrocontable', authenticationToken, async (req
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -3076,6 +3168,7 @@ app.get('/api/consultaproductospadres/:SucursalId/:DescripcionPadre', authentica
 
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -3299,6 +3392,7 @@ app.post('/api/cambiosdepresentacionajustes', authenticationToken, async (req, r
 
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	} finally {
 		client.release()
@@ -3359,6 +3453,7 @@ app.get('/api/consultaproductosinventarioperpetuo/:SucursalId/:CodigoId', authen
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -3670,6 +3765,7 @@ app.get('/api/estadoderesultadoslimpiaduria/:Periodo', authenticationToken, asyn
 
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 
@@ -3703,6 +3799,7 @@ app.get('/api/estadoderesultadoslimpiaduriacifracontrol/:Periodo', authenticatio
 
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 
@@ -3719,6 +3816,7 @@ app.get('/api/consultaaniosactivos', authenticationToken, async (req, res) => {
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -3738,6 +3836,7 @@ app.get('/api/consultaperiodosporanio/:anio', authenticationToken, async (req, r
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -3767,6 +3866,7 @@ app.get('/api/consultalimpiaduriaventaspormes/:anio', authenticationToken, async
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -3798,6 +3898,7 @@ app.get('/api/consultalimpiaduriaegresospormes/:anio', authenticationToken, asyn
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -3826,6 +3927,7 @@ app.get('/api/consultamelateventaspormes/:anio', authenticationToken, async (req
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -3859,6 +3961,7 @@ app.get('/api/consultamelateegresospormes/:anio', authenticationToken, async (re
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -3987,6 +4090,7 @@ app.get('/api/gastosinversionesporanio/:year', authenticationToken, async (req, 
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -4015,6 +4119,7 @@ app.get('/api/consultagastosinversionperiodo/:Periodo', authenticationToken, asy
 
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -4116,6 +4221,7 @@ app.get('/api/ventas/bi/lavamatica/:year', authenticationToken, async (req, res)
 
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -4190,6 +4296,7 @@ app.get('/api/ventas/bi/tienda/:year', authenticationToken, async (req, res) => 
 
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -4265,6 +4372,7 @@ app.get('/api/ventas/bi/decorafiestas/:year', authenticationToken, async (req, r
 
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -4369,6 +4477,7 @@ app.get('/api/limpiaduria/bi/estadoresultadoslimpiadurianegocios/:year', authent
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -4480,6 +4589,7 @@ app.get('/api/consultainvnetarioperpetuohistoriaporperiodo/:year', authenticatio
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -4514,6 +4624,7 @@ app.get('/api/inventariofaltantes/:SucursalId', authenticationToken, async (req,
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -4571,6 +4682,7 @@ app.get('/api/lavadassecadasservicios/:SucursalId/:year', authenticationToken, a
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -4619,6 +4731,7 @@ app.get('/api/egresoslimpiaduriacuentacontable/:year/:consulta', authenticationT
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -4675,6 +4788,7 @@ app.get('/api/egresoslimpiaduriacuentacontablesubcuentacontablemes/:year/:mes/:C
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
@@ -4741,9 +4855,18 @@ app.get('/api/productosmasdesplazadosmargen/:FechaInicial/:FechaFinal/:SucursalI
 		res.status(200).json(data)
 	} catch (error) {
 		console.log(error.message)
+		Sentry.captureException(error); // <--- Esto envía el error de la DB a Sentry
 		res.status(500).json({ "error": error.message })
 	}
 })
+
+
+
+//Sentry
+// The error handler must be registered before any other error middleware and after all controllers
+Sentry.setupExpressErrorHandler(app);
+
+
 
 function authenticationToken(req, res, next) {
 	const authHeader = req.headers['authorization']

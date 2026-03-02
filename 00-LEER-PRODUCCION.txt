@@ -1,5 +1,16 @@
 Para ejecutar el server.js
 
+
+//Para instalar SENTRY.io (Error Tracking)
+
+npm install @sentry/node --save
+
+
+
+
+user: desarrollo
+password: desarrollo123
+
 Ambiente Development:
 npm run devStart
 
